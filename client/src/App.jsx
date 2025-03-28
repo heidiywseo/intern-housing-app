@@ -10,6 +10,8 @@ import LoadingPage from "./pages/LoadingPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import CompleteProfileChoice from "./pages/CompleteProfileChoice";
+import UserProfile from "./pages/UserProfilePage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +47,8 @@ export default function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/login" element={<LoginPage setUser={setUser} />} />
           <Route path="/signup" element={<SignupPage setUser={setUser} />} />
+          <Route path="/completeProfileChoice" element={<CompleteProfileChoice />} />
+          <Route path="/userProfile" element={<UserProfile/>} />
         </Routes>
       )}
     </Router>
