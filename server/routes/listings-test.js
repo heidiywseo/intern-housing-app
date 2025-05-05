@@ -1,3 +1,5 @@
+// this file is similar to listings.js without the complexities of the query, just to test that the remainder of the script is functioning
+// specify the port in your local config.js (localhost:3000), start the server, and go to http://localhost:3000/listingsTest/search
 const express = require('express');
 const router = express.Router();
 const { Pool, types } = require('pg');
