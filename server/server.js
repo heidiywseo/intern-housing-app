@@ -11,6 +11,7 @@ app.use(express.json());
 const listingsRoutes = require('./routes/listings');
 app.use('/listings', listingsRoutes);
 
+// added below is for the tests, will not be used for final app, just for testing
 const listingsTestRoutes = require('./routes/listings-test');
 app.use('/listingsTest', listingsTestRoutes);
 
