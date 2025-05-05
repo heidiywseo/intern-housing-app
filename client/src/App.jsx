@@ -10,6 +10,8 @@ import LoadingPage from "./pages/LoadingPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
+import PreferenceForm from "./pages/PreferenceForm";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +47,12 @@ export default function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/login" element={<LoginPage setUser={setUser} />} />
           <Route path="/signup" element={<SignupPage setUser={setUser} />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route
+             path="/edit-preferences"
+            element={<PreferenceForm userId={auth.currentUser?.uid} onComplete={() => window.location = "/profile"} />}
+          />
         </Routes>
       )}
     </Router>
