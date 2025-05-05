@@ -11,6 +11,9 @@ app.use(express.json());
 const listingsRoutes = require('./routes/listings');
 app.use('/listings', listingsRoutes);
 
+const listingsTestRoutes = require('./routes/listings-test');
+app.use('/listingsTest', listingsTestRoutes);
+
 app.listen(config.server_port, () => {
   console.log(`Server running at http://${config.server_host}:${config.server_port}/`);
 });
