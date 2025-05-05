@@ -1,3 +1,4 @@
+// this file was purely to test that the database was connectable
 const { Pool } = require('pg');
 const config = require('../config.json');
 
@@ -16,7 +17,7 @@ async function testConnection() {
   try {
     const client = await pool.connect();
     console.log('Connected');
-    const res = await client.query('SELECT DISTINCT region FROM airbnb LIMIT 10;');
+    const res = await client.query('SELECT DISTINCT region FROM airbnb LIMIT 10;'); // test query - success
     console.log(res);
     client.release();
   } catch (err) {
