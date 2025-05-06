@@ -26,7 +26,6 @@ const placesMap = {
 };
 
 async function checkSchemaAndTables() {
-  // (unchanged: verifies that public schema and tables exist)
   const schemaCheck = await pool.query(
     `SELECT EXISTS (SELECT FROM information_schema.schemata WHERE schema_name = 'public') AS exists`
   );
@@ -51,8 +50,6 @@ async function checkSchemaAndTables() {
 router.get('/search', async (req, res) => {
   try {
     await checkSchemaAndTables();
-
-    // --- parse & validate ---
     const region = req.query.region?.trim();
     const min_rating = Number(req.query.min_rating) || 0;
     const max_price = Number(req.query.max_price) || 999999;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import axios from "axios";
 
 export default function PreferenceForm({ userId, onComplete }) {
   const [prefs, setPrefs] = useState({
@@ -32,8 +33,31 @@ export default function PreferenceForm({ userId, onComplete }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await updateDoc(doc(db, "users", userId), prefs);
-    onComplete?.();
+    try {
+      // Update Firebase
+      await updateDoc(doc(db, "users", userId), prefs);
+
+      // Update PostgreSQL
+      await axios.put(`http://localhost:3001/users/${userId}/preferences`, {
+        min_budget: prefs.minBudget ? parseFloat(prefs.minBudget) : null,
+        max_budget: prefs.maxBudget ? parseFloat(prefs.maxBudget) : null,
+        work_zip_code: prefs.workLocation || null,
+        roommate_status: prefs.roommateStatus || null,
+        sleep_time: prefs.sleepTime || null,
+        wake_time: prefs.wakeTime || null,
+        cleanliness: prefs.cleanliness || null,
+        noise_tolerance: prefs.noiseTolerance || null,
+        guest_frequency: prefs.guests || null,
+        smoking_preference: prefs.smoking || null,
+        drinking_preference: prefs.drinking || null,
+        pet_preference: prefs.pets || null,
+      });
+
+      onComplete?.();
+    } catch (error) {
+      console.error("Preference update error:", error);
+      alert("Error updating preferences: " + error.message);
+    }
   };
 
   return (
@@ -95,6 +119,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Bedtime</label>
             <select name="sleepTime" value={prefs.sleepTime} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>Before 9:00 PM</option>
               <option>Between 9:00 PM - 11:00 PM</option>
               <option>Between 11:00 PM - 1:00 AM</option>
@@ -105,6 +130,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Wake Time</label>
             <select name="wakeTime" value={prefs.wakeTime} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>Before 6:00 AM</option>
               <option>6:00 AM - 8:00 AM</option>
               <option>8:00 AM - 10:00 AM</option>
@@ -115,6 +141,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Cleanliness</label>
             <select name="cleanliness" value={prefs.cleanliness} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>I deep clean daily</option>
               <option>I clean up once a week</option>
               <option>I clean every two weeks</option>
@@ -125,6 +152,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Noise Tolerance</label>
             <select name="noiseTolerance" value={prefs.noiseTolerance} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>I need complete quiet</option>
               <option>Okay with background TV/music</option>
               <option>Don't mind frequent guests or noise</option>
@@ -135,6 +163,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Guest Frequency</label>
             <select name="guests" value={prefs.guests} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>Rarely or never</option>
               <option>Occasionally (few times/month)</option>
               <option>Often (weekly)</option>
@@ -145,6 +174,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Smoking</label>
             <select name="smoking" value={prefs.smoking} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>No</option>
               <option>Yes, but only outside</option>
               <option>Yes, including indoors</option>
@@ -154,6 +184,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Drinking</label>
             <select name="drinking" value={prefs.drinking} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>No</option>
               <option>Occasionally (socially)</option>
               <option>Regularly</option>
@@ -163,6 +194,7 @@ export default function PreferenceForm({ userId, onComplete }) {
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Pets</label>
             <select name="pets" value={prefs.pets} onChange={handleChange} className="w-full p-2 border rounded-lg">
+              <option value="">Select an option</option>
               <option>Yes, I love pets!</option>
               <option>Okay with pets but don’t own any</option>
               <option>Not okay with pets</option>

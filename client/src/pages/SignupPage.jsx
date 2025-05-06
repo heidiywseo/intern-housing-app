@@ -1,12 +1,10 @@
-// SignupPage.jsx
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
-
-// 👉 Make sure you have this import!
+import axios from "axios";
 import PreferenceForm from "./PreferenceForm";
 
 export default function SignupPage() {
@@ -25,27 +23,37 @@ export default function SignupPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      formData.email,
-      formData.password
-    );
-    const user = cred.user;
+    try {
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      const user = cred.user;
 
-    // set displayName
-    await updateProfile(user, {
-      displayName: `${formData.firstName} ${formData.lastName}`,
-    });
+  
 
-    // write basic info
-    await setDoc(doc(db, "users", user.uid), {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-    });
+      // write basic info to Firebase
+      await setDoc(doc(db, "users", user.uid), {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+      });
 
-    setUserId(user.uid);
-    setStep("askPrefs");
+      // write to PostgreSQL
+      await axios.post("http://localhost:3001/users", {
+        user_id: user.uid,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+      });
+
+      setUserId(user.uid);
+      setStep("askPrefs");
+    } catch (error) {
+      console.error("Signup error:", error);
+      alert("Error during signup: " + error.message);
+    }
   };
 
   return (
