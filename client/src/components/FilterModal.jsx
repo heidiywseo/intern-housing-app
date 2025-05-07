@@ -1,41 +1,72 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { Slider, Box, Typography } from '@mui/material';
+import { styled } from '@mui/material/styles';
 
-const FilterModal = ({ isOpen, onClose, onApply }) => {
-  const [priceRange, setPriceRange] = useState([800, 2500]);
-  const [roomType, setRoomType] = useState("any");
-  const [dateRange, setDateRange] = useState({
-    startDate: "2025-06-01",
-    endDate: "2025-08-31"
-  });
+const CustomSlider = styled(Slider)(({ theme }) => ({
+  '& .MuiSlider-track': {
+    backgroundColor: '#4E674A',
+    border: 'none',
+  },
+  '& .MuiSlider-rail': {
+    backgroundColor: '#d1d5db',
+    opacity: 1,
+  },
+  '& .MuiSlider-thumb': {
+    backgroundColor: '#4E674A',
+    width: 20,
+    height: 20,
+    '&:hover, &.Mui-focusVisible': {
+      boxShadow: '0px 0px 0px 8px rgba(78, 103, 74, 0.16)',
+    },
+  },
+  '& .MuiSlider-mark': {
+    backgroundColor: '#4E674A',
+  },
+  '& .MuiSlider-markLabel': {
+    color: '#4E674A',
+  },
+}));
+
+const FilterModal = ({ isOpen, onClose, onApply, initialFilters }) => {
+  const [priceRange, setPriceRange] = useState(initialFilters?.priceRange || [500, 5000]);
+  const [distance, setDistance] = useState(initialFilters?.distance || 10); // Default to 10km
+  const [rating, setRating] = useState(initialFilters?.rating || 1); // Default to 1 star
+  const [roomType, setRoomType] = useState(initialFilters?.roomType || 'any');
   const [amenities, setAmenities] = useState({
-    wifi: false,
-    parking: false,
-    gym: false,
-    laundry: true,
-    ac: false,
-    furnished: true
+    has_wifi: initialFilters?.amenities?.has_wifi || false,
+    has_kitchen: initialFilters?.amenities?.has_kitchen || false,
+    has_air_conditioning: initialFilters?.amenities?.has_air_conditioning || false,
+    has_parking: initialFilters?.amenities?.has_parking || false,
+    has_nearby_gym: initialFilters?.amenities?.has_nearby_gym || false,
+    has_nearby_grocery: initialFilters?.amenities?.has_nearby_grocery || false,
   });
 
   const handleAmenityChange = (amenity) => {
     setAmenities({
       ...amenities,
-      [amenity]: !amenities[amenity]
+      [amenity]: !amenities[amenity],
     });
   };
 
-  const handlePriceChange = (newRange) => {
-    setPriceRange(newRange);
+  const handlePriceChange = (event, newValue) => {
+    setPriceRange(newValue);
+  };
+
+  const handleRatingChange = (event, newValue) => {
+    setRating(newValue);
   };
 
   const applyFilters = () => {
     onApply({
       priceRange,
+      distance,
+      rating,
       roomType,
-      dateRange,
-      amenities
+      amenities,
     });
+    onClose();
   };
 
   const handleBackgroundClick = (e) => {
@@ -47,48 +78,86 @@ const FilterModal = ({ isOpen, onClose, onApply }) => {
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex justify-center items-center p-4"
+    <div
+      className="fixed inset-0 z-50 flex justify-center items-center p-4 bg-black/50"
       onClick={handleBackgroundClick}
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="bg-white p-6 flex justify-between items-center z-10">
+        <div className="bg-white p-6 flex justify-between items-center sticky top-0 z-10">
           <h2 className="text-2xl font-bold text-[#4E674A]">Filter by</h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-[#4E674A] hover:text-[#4E674A]/70"
           >
             <FontAwesomeIcon icon={faXmark} className="text-2xl" />
           </button>
         </div>
-        
-        <div className="px-6">
+
+        <div className="px-6 pb-6">
+          {/* Price Range */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Price Range</h3>
-            <div className="flex justify-between mb-2">
-              <span className="bg-green">${priceRange[0]}</span>
-              <span>${priceRange[1]}</span>
-            </div>
-            <input 
-              type="range"
-              min="500"
-              max="5000"
-              value={priceRange[0]}
-              onChange={(e) => handlePriceChange([parseInt(e.target.value), priceRange[1]])}
-              className="w-full"
-            />
-            <input 
-              type="range"
-              min="500"
-              max="5000"
-              value={priceRange[1]}
-              onChange={(e) => handlePriceChange([priceRange[0], parseInt(e.target.value)])}
-              className="w-full"
+            <Typography variant="h6" className="text-lg font-semibold mb-3 text-[#4E674A]">
+              Price Range
+            </Typography>
+            <Box display="flex" justifyContent="space-between" mb={2}>
+              <Typography className="text-[#4E674A]">${priceRange[0]}</Typography>
+              <Typography className="text-[#4E674A]">${priceRange[1]}</Typography>
+            </Box>
+            <CustomSlider
+              value={priceRange}
+              onChange={handlePriceChange}
+              valueLabelDisplay="auto"
+              min={500}
+              max={5000}
+              step={100}
+              disableSwap
             />
           </div>
-          
+
+          {/* Distance to Workplace */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Room Type</h3>
+            <Typography variant="h6" className="text-lg font-semibold mb-3 text-[#4E674A]">
+              Distance to Workplace
+            </Typography>
+            <select
+              value={distance}
+              onChange={(e) => setDistance(parseFloat(e.target.value))}
+              className="w-full p-2 border rounded text-[#4E674A] focus:outline-none focus:ring-2 focus:ring-[#4E674A]"
+            >
+              <option value={0.5}>0.5 km</option>
+              <option value={1}>1 km</option>
+              <option value={2}>2 km</option>
+              <option value={5}>5 km</option>
+              <option value={10}>10 km</option>
+              <option value={20}>20 km</option>
+            </select>
+          </div>
+
+          {/* Rating */}
+          <div className="mb-6">
+            <Typography variant="h6" className="text-lg font-semibold mb-3 text-[#4E674A]">
+              Minimum Rating
+            </Typography>
+            <Box display="flex" justifyContent="space-between" mb={2}>
+              <Typography className="text-[#4E674A]">
+                {rating} Star{rating > 1 ? 's' : ''}
+              </Typography>
+            </Box>
+            <CustomSlider
+              value={rating}
+              onChange={handleRatingChange}
+              valueLabelDisplay="auto"
+              min={1}
+              max={5}
+              step={1}
+            />
+          </div>
+
+          {/* Room Type */}
+          <div className="mb-6">
+            <Typography variant="h6" className="text-lg font-semibold mb-3 text-[#4E674A]">
+              Room Type
+            </Typography>
             <div className="grid grid-cols-2 gap-2">
               <button
                 className={`p-2 border rounded ${roomType === 'any' ? 'bg-[#4E674A] text-white' : 'border-[#4E674A] text-[#4E674A]'}`}
@@ -116,92 +185,72 @@ const FilterModal = ({ isOpen, onClose, onApply }) => {
               </button>
             </div>
           </div>
-          
+
+          {/* Amenities */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Date Range</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={dateRange.startDate}
-                  onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={dateRange.endDate}
-                  onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
-                  className="w-full p-2 border rounded"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">Amenities</h3>
+            <Typography variant="h6" className="text-lg font-semibold mb-3 text-[#4E674A]">
+              Amenities
+            </Typography>
             <div className="grid grid-cols-2 gap-2">
               <label className="flex items-center space-x-2">
-                <input 
+                <input
                   type="checkbox"
-                  checked={amenities.wifi}
-                  onChange={() => handleAmenityChange('wifi')}
+                  checked={amenities.has_wifi}
+                  onChange={() => handleAmenityChange('has_wifi')}
                   className="form-checkbox h-5 w-5 text-[#4E674A]"
                 />
                 <span>WiFi</span>
               </label>
               <label className="flex items-center space-x-2">
-                <input 
+                <input
                   type="checkbox"
-                  checked={amenities.parking}
-                  onChange={() => handleAmenityChange('parking')}
+                  checked={amenities.has_kitchen}
+                  onChange={() => handleAmenityChange('has_kitchen')}
+                  className="form-checkbox h-5 w-5 text-[#4E674A]"
+                />
+                <span>Kitchen</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={amenities.has_air_conditioning}
+                  onChange={() => handleAmenityChange('has_air_conditioning')}
+                  className="form-checkbox h-5 w-5 text-[#4E674A]"
+                />
+                <span>Air Conditioning</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={amenities.has_parking}
+                  onChange={() => handleAmenityChange('has_parking')}
                   className="form-checkbox h-5 w-5 text-[#4E674A]"
                 />
                 <span>Parking</span>
               </label>
               <label className="flex items-center space-x-2">
-                <input 
+                <input
                   type="checkbox"
-                  checked={amenities.gym}
-                  onChange={() => handleAmenityChange('gym')}
+                  checked={amenities.has_nearby_gym}
+                  onChange={() => handleAmenityChange('has_nearby_gym')}
                   className="form-checkbox h-5 w-5 text-[#4E674A]"
                 />
-                <span>Gym</span>
+                <span>Gym within 200m</span>
               </label>
               <label className="flex items-center space-x-2">
-                <input 
+                <input
                   type="checkbox"
-                  checked={amenities.laundry}
-                  onChange={() => handleAmenityChange('laundry')}
+                  checked={amenities.has_nearby_grocery}
+                  onChange={() => handleAmenityChange('has_nearby_grocery')}
                   className="form-checkbox h-5 w-5 text-[#4E674A]"
                 />
-                <span>Laundry</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  checked={amenities.ac}
-                  onChange={() => handleAmenityChange('ac')}
-                  className="form-checkbox h-5 w-5 text-[#4E674A]"
-                />
-                <span>A/C</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input 
-                  type="checkbox"
-                  checked={amenities.furnished}
-                  onChange={() => handleAmenityChange('furnished')}
-                  className="form-checkbox h-5 w-5 text-[#4E674A]"
-                />
-                <span>Furnished</span>
+                <span>Grocery within 200m</span>
               </label>
             </div>
           </div>
-          
-          <button 
+
+          {/* Apply Button */}
+          <button
             onClick={applyFilters}
             className="w-full py-3 mb-2 bg-[#4E674A] text-white font-semibold rounded-lg hover:bg-[#4E674A]/90 transition"
           >
