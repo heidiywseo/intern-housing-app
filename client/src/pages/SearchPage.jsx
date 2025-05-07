@@ -56,9 +56,9 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
         latitude: lat,
         longitude: lng,
         page: pageNum,
-        page_size: 20,
+        page_size: 21, // Changed to 21
       });
-
+  
       if (filters) {
         if (filters.rating) params.append('min_rating', filters.rating);
         if (filters.priceRange) {
@@ -74,7 +74,7 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
           };
           params.append('room_type', roomTypeMap[filters.roomType]);
         }
-
+  
         const amenities = Object.entries(filters.amenities || {})
           .filter(([_, isSelected]) => isSelected)
           .map(([amenity]) => amenity);
@@ -82,7 +82,7 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
         if (amenities.includes('has_nearby_gym')) places.push('gym');
         if (amenities.includes('has_nearby_grocery')) places.push('supermarket');
         if (places.length) params.append('places', JSON.stringify(places));
-
+  
         const listingAmenities = amenities.filter(
           (a) => !['has_nearby_gym', 'has_nearby_grocery'].includes(a)
         );
@@ -90,14 +90,14 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
           params.append('amenities', JSON.stringify(listingAmenities));
         }
       }
-
+  
       const response = await fetch(`http://localhost:3000/listings/search?${params.toString()}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch listings');
       }
       const data = await response.json();
-
+  
       setFilteredHouses(
         data.listings.map((listing) => ({
           id: listing.listing_id,
