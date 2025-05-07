@@ -36,7 +36,23 @@ export default function PreferenceForm({ userId, onComplete }) {
       // Update Firebase
       await updateDoc(doc(db, "users", userId), prefs);
 
-      
+      // Sync with AWS database via API Gateway
+      // Replace with your actual API Gateway invoke URL, e.g., https://abcdef123.execute-api.us-east-1.amazonaws.com/prod/api/users/update
+      const response = await fetch(
+        "https://<your-api-gateway-id>.execute-api.<region>.amazonaws.com/prod/api/users/update",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            ...prefs,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to sync with AWS database");
+      }
 
       onComplete?.();
     } catch (error) {
@@ -168,10 +184,10 @@ export default function PreferenceForm({ userId, onComplete }) {
               className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
               <option value="">Select an option</option>
-              <option>I need complete quiet to focus or sleep</option>
-              <option>Okay with white noise or background TV/music</option>
-              <option>I don't mind frequent guests or late-night noise</option>
-              <option>I’m generally okay with most types of noise</option>
+              <option>I need complete quiet</option>
+              <option>Okay with background TV/music</option>
+              <option>Don't mind frequent guests or noise</option>
+              <option>Generally okay with most noise</option>
             </select>
           </div>
 
@@ -187,9 +203,9 @@ export default function PreferenceForm({ userId, onComplete }) {
             >
               <option value="">Select an option</option>
               <option>Rarely or never</option>
-              <option>Occasionally (a few times a month)</option>
+              <option>Occasionally (few times/month)</option>
               <option>Often (weekly)</option>
-              <option>Very frequently (multiple times a week)</option>
+              <option>Very frequently (multiple times/week)</option>
             </select>
           </div>
 
@@ -240,7 +256,7 @@ export default function PreferenceForm({ userId, onComplete }) {
               <option value="">Select an option</option>
               <option>Yes, I love pets!</option>
               <option>Okay with pets but don’t own any</option>
-              <option>Not okay with pets due to allergies or preference</option>
+              <option>Not okay with pets</option>
             </select>
           </div>
         </div>

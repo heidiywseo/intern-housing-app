@@ -11,6 +11,8 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import SearchPage from "./pages/SearchPage";
 import HouseInfo from "./pages/HouseInfo";
+import ProfilePage from './pages/ProfilePage';
+import PreferenceForm from './pages/PreferenceForm';
 
 
 const dummyHouses = [
@@ -152,6 +154,13 @@ export default function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/login" element={<LoginPage setUser={setUser} />} />
           <Route path="/signup" element={<SignupPage setUser={setUser} />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route
+             path="/edit-preferences"
+            element={<PreferenceForm userId={auth.currentUser?.uid} onComplete={() => window.location = "/profile"} />}
+          />
+       
+      
         </Routes>
       )}
     </Router>
