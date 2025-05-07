@@ -36,19 +36,16 @@ export default function PreferenceForm({ userId, onComplete }) {
       // Update Firebase
       await updateDoc(doc(db, "users", userId), prefs);
 
-      // Sync with AWS database via API Gateway
-      // Replace with your actual API Gateway invoke URL, e.g., https://abcdef123.execute-api.us-east-1.amazonaws.com/prod/api/users/update
-      const response = await fetch(
-        "https://<your-api-gateway-id>.execute-api.<region>.amazonaws.com/prod/api/users/update",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            ...prefs,
-          }),
-        }
-      );
+      
+      const response = await fetch("http://localhost:3000/api/users/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          ...prefs,
+        }),
+      });
+      
 
       if (!response.ok) {
         throw new Error("Failed to sync with AWS database");
