@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const userRoutes = require('./routes/users');
 
 // Load config.json
 const configPath = path.join(__dirname, 'config.json');
@@ -13,6 +12,10 @@ app.use(cors());
 app.use(express.json());
 
 // Mount routes
+const listingsRoutes = require('./routes/listings');
+app.use('/listings', listingsRoutes);
+
+const userRoutes = require('./routes/users');
 app.use('/api/users', userRoutes);
 
 
