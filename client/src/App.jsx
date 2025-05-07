@@ -159,7 +159,6 @@ export default function App() {
              path="/edit-preferences"
             element={<PreferenceForm userId={auth.currentUser?.uid} onComplete={() => window.location = "/profile"} />}
           />
-       
       
         </Routes>
       )}
