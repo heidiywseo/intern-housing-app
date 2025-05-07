@@ -6,10 +6,11 @@ import { Autocomplete, useLoadScript } from '@react-google-maps/api';
 import Navbar from '../components/Navbar';
 import HouseCard from '../components/HouseCard';
 import FilterModal from '../components/FilterModal';
+import { auth } from '../firebase';
 
 const libraries = ['places'];
 
-export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse }) {
+export default function SearchPage({ user, setUser }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchValue, setSearchValue] = useState('');
@@ -17,6 +18,7 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState(null);
   const [filteredHouses, setFilteredHouses] = useState([]);
+  const [savedHouses, setSavedHouses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autocomplete, setAutocomplete] = useState(null);
@@ -27,6 +29,25 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
   });
+
+  // Fetch user's favorite listings
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (user && auth.currentUser) {
+        try {
+          const response = await fetch('http://localhost:3000/favorites', {
+            headers: { 'X-User-ID': auth.currentUser.uid },
+          });
+          if (!response.ok) throw new Error('Failed to fetch favorites');
+          const favorites = await response.json();
+          setSavedHouses(favorites.map((house) => house.id));
+        } catch (error) {
+          console.error('Error fetching favorites:', error);
+        }
+      }
+    };
+    fetchFavorites();
+  }, [user]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -56,16 +77,16 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
         latitude: lat,
         longitude: lng,
         page: pageNum,
-        page_size: 21, // Changed to 21
+        page_size: 21,
       });
-  
+
       if (filters) {
         if (filters.rating) params.append('min_rating', filters.rating);
         if (filters.priceRange) {
           params.append('min_price', filters.priceRange[0]);
           params.append('max_price', filters.priceRange[1]);
         }
-        if (filters.distance) params.append('distance', filters.distance * 1000); // Convert km to meters
+        if (filters.distance) params.append('distance', filters.distance * 1000);
         if (filters.roomType && filters.roomType !== 'any') {
           const roomTypeMap = {
             private: 'Private room',
@@ -74,7 +95,7 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
           };
           params.append('room_type', roomTypeMap[filters.roomType]);
         }
-  
+
         const amenities = Object.entries(filters.amenities || {})
           .filter(([_, isSelected]) => isSelected)
           .map(([amenity]) => amenity);
@@ -82,7 +103,7 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
         if (amenities.includes('has_nearby_gym')) places.push('gym');
         if (amenities.includes('has_nearby_grocery')) places.push('supermarket');
         if (places.length) params.append('places', JSON.stringify(places));
-  
+
         const listingAmenities = amenities.filter(
           (a) => !['has_nearby_gym', 'has_nearby_grocery'].includes(a)
         );
@@ -90,14 +111,14 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
           params.append('amenities', JSON.stringify(listingAmenities));
         }
       }
-  
+
       const response = await fetch(`http://localhost:3000/listings/search?${params.toString()}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch listings');
       }
       const data = await response.json();
-  
+
       setFilteredHouses(
         data.listings.map((listing) => ({
           id: listing.listing_id,
@@ -106,8 +127,8 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
           description: listing.description || 'No description available',
           images: [listing.picture_url || 'https://via.placeholder.com/400x200?text=No+Image'],
           bedrooms: listing.bedrooms || '--',
-          bathrooms: listing.beds || '--', // Proxy; add bathrooms column if needed
-          area: '--', // Add area column if needed
+          bathrooms: listing.beds || '--',
+          area: '--',
           roomType: listing.room_type,
           rating: listing.rating,
         }))
@@ -120,6 +141,39 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
       setFilteredHouses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleSaveHouse = async (listingId) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const isSaved = savedHouses.includes(listingId);
+      const method = isSaved ? 'DELETE' : 'POST';
+      const url = isSaved
+        ? `http://localhost:3000/favorites/${listingId}`
+        : 'http://localhost:3000/favorites';
+      const body = isSaved ? {} : { listing_id: listingId };
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-ID': auth.currentUser.uid,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) throw new Error('Failed to update favorite');
+
+      setSavedHouses((prev) =>
+        isSaved ? prev.filter((id) => id !== listingId) : [...prev, listingId]
+      );
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
     }
   };
 

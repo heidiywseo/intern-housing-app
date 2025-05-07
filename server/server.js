@@ -11,6 +11,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Middleware to extract user_id from headers
+app.use((req, res, next) => {
+  const userId = req.headers['x-user-id'];
+  if (userId) {
+    req.user = { user_id: userId };
+  }
+  next();
+});
+
 // Mount routes
 const listingsRoutes = require('./routes/listings');
 app.use('/listings', listingsRoutes);
@@ -18,6 +27,8 @@ app.use('/listings', listingsRoutes);
 const userRoutes = require('./routes/users');
 app.use('/api/users', userRoutes);
 
+const favoritesRoutes = require('./routes/favorites');
+app.use('/favorites', favoritesRoutes);
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {
