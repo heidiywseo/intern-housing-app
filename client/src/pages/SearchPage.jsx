@@ -1,44 +1,41 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass, faSliders, faMap } from '@fortawesome/free-solid-svg-icons';
 import { Autocomplete, useLoadScript } from '@react-google-maps/api';
-import Navbar from "../components/Navbar";
-import HouseCard from "../components/HouseCard";
-import FilterModal from "../components/FilterModal";
+import Navbar from '../components/Navbar';
+import HouseCard from '../components/HouseCard';
+import FilterModal from '../components/FilterModal';
 
-// Define libraries as a static constant to prevent reload warning
 const libraries = ['places'];
 
-export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse, houses }) {
+export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchValue, setSearchValue] = useState("");
+  const [searchValue, setSearchValue] = useState('');
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState(null);
   const [filteredHouses, setFilteredHouses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [autocomplete, setAutocomplete] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Load Google Maps script
-  // Ensure VITE_GOOGLE_MAPS_API_KEY is set in .env (e.g., VITE_GOOGLE_MAPS_API_KEY=your-api-key)
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    libraries: ['places'],
+    libraries,
   });
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
-    const addressParam = queryParams.get("address");
+    const addressParam = queryParams.get('address');
     if (addressParam) {
       setSearchValue(addressParam);
-      filterHousesByAddress(addressParam);
-    } else {
-      setFilteredHouses([]);
     }
     window.scrollTo(0, 0);
-  }, [location.search, houses]);
+  }, [location.search]);
 
   useEffect(() => {
     if (showFilterModal) {
@@ -51,96 +48,91 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
     };
   }, [showFilterModal]);
 
-  const filterHousesByAddress = (address, place = null) => {
+  const fetchListings = async (lat, lng, filters = activeFilters, pageNum = 1) => {
     setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        latitude: lat,
+        longitude: lng,
+        page: pageNum,
+        page_size: 20,
+      });
 
-    let filtered = houses;
-    if (place) {
-      // Extract address components (e.g., city, ZIP code) from Google Places result
-      const addressComponents = place.address_components || [];
-      const city = addressComponents.find(comp => comp.types.includes('locality'))?.long_name;
-      const postalCode = addressComponents.find(comp => comp.types.includes('postal_code'))?.long_name;
-      const state = addressComponents.find(comp => comp.types.includes('administrative_area_level_1'))?.short_name;
+      if (filters) {
+        if (filters.rating) params.append('min_rating', filters.rating);
+        if (filters.priceRange) {
+          params.append('min_price', filters.priceRange[0]);
+          params.append('max_price', filters.priceRange[1]);
+        }
+        if (filters.distance) params.append('distance', filters.distance * 1000); // Convert km to meters
+        if (filters.roomType && filters.roomType !== 'any') {
+          const roomTypeMap = {
+            private: 'Private room',
+            shared: 'Shared room',
+            entire: 'Entire home/apt',
+          };
+          params.append('room_type', roomTypeMap[filters.roomType]);
+        }
 
-      filtered = houses.filter(house => {
-        const locationLower = house.location?.toLowerCase() || '';
-        const houseCity = house.city?.toLowerCase() || '';
-        const houseZip = house.zip_code || '';
-        const houseState = house.state?.toLowerCase() || '';
+        const amenities = Object.entries(filters.amenities || {})
+          .filter(([_, isSelected]) => isSelected)
+          .map(([amenity]) => amenity);
+        const places = [];
+        if (amenities.includes('has_nearby_gym')) places.push('gym');
+        if (amenities.includes('has_nearby_grocery')) places.push('supermarket');
+        if (places.length) params.append('places', JSON.stringify(places));
 
-        return (
-          (city && (locationLower.includes(city.toLowerCase()) || houseCity.includes(city.toLowerCase()))) ||
-          (postalCode && houseZip === postalCode) ||
-          (state && houseState.includes(state.toLowerCase())) ||
-          locationLower.includes(address.toLowerCase())
+        const listingAmenities = amenities.filter(
+          (a) => !['has_nearby_gym', 'has_nearby_grocery'].includes(a)
         );
-      });
-    } else {
-      // Fallback to string-based search if no place object
-      const addressLower = address.toLowerCase();
-      filtered = houses.filter(house => {
-        const locationLower = house.location?.toLowerCase() || '';
-        const houseCity = house.city?.toLowerCase() || '';
-        return locationLower.includes(addressLower) || houseCity.includes(addressLower);
-      });
-    }
-
-    // Apply active filters if present
-    if (activeFilters) {
-      filtered = applyFilters(filtered, activeFilters);
-    }
-
-    setFilteredHouses(filtered);
-    setLoading(false);
-  };
-
-  const applyFilters = (housesToFilter, filters) => {
-    let filtered = [...housesToFilter];
-
-    // Price filter
-    if (filters.priceRange) {
-      filtered = filtered.filter(house =>
-        house.price >= filters.priceRange[0] &&
-        house.price <= filters.priceRange[1]
-      );
-    }
-
-    // Room type filter
-    if (filters.roomType && filters.roomType !== 'any') {
-      filtered = filtered.filter(house =>
-        house.roomType === filters.roomType
-      );
-    }
-
-    // Amenities filter
-    if (filters.amenities) {
-      const requiredAmenities = Object.entries(filters.amenities)
-        .filter(([_, isSelected]) => isSelected)
-        .map(([amenity]) => amenity.toLowerCase());
-
-      if (requiredAmenities.length > 0) {
-        filtered = filtered.filter(house => {
-          if (!house.amenities) return false;
-          return requiredAmenities.every(requiredAmenity =>
-            house.amenities.some(houseAmenity =>
-              houseAmenity.toLowerCase() === requiredAmenity
-            )
-          );
-        });
+        if (listingAmenities.length) {
+          params.append('amenities', JSON.stringify(listingAmenities));
+        }
       }
-    }
 
-    return filtered;
+      const response = await fetch(`http://localhost:3000/listings/search?${params.toString()}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch listings');
+      }
+      const data = await response.json();
+
+      setFilteredHouses(
+        data.listings.map((listing) => ({
+          id: listing.listing_id,
+          title: listing.name,
+          price: listing.price_per_month,
+          description: listing.description || 'No description available',
+          images: [listing.picture_url || 'https://via.placeholder.com/400x200?text=No+Image'],
+          bedrooms: listing.bedrooms || '--',
+          bathrooms: listing.beds || '--', // Proxy; add bathrooms column if needed
+          area: '--', // Add area column if needed
+          roomType: listing.room_type,
+          rating: listing.rating,
+        }))
+      );
+      setTotalPages(Math.ceil(data.total / data.page_size));
+      setPage(data.page);
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+      setError(error.message);
+      setFilteredHouses([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePlaceSelect = () => {
     if (autocomplete) {
       const place = autocomplete.getPlace();
-      if (place && place.formatted_address) {
+      if (place && place.formatted_address && place.geometry) {
         setSearchValue(place.formatted_address);
         setSelectedPlace(place);
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
         navigate(`/search?address=${encodeURIComponent(place.formatted_address)}`, { replace: true });
-        filterHousesByAddress(place.formatted_address, place);
+        fetchListings(lat, lng);
       }
     }
   };
@@ -156,9 +148,18 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
   const handleApplyFilters = (filters) => {
     setActiveFilters(filters);
     setShowFilterModal(false);
+    if (selectedPlace && selectedPlace.geometry) {
+      const lat = selectedPlace.geometry.location.lat();
+      const lng = selectedPlace.geometry.location.lng();
+      fetchListings(lat, lng, filters);
+    }
+  };
 
-    if (searchValue) {
-      filterHousesByAddress(searchValue, selectedPlace);
+  const handlePageChange = (newPage) => {
+    if (selectedPlace && selectedPlace.geometry) {
+      const lat = selectedPlace.geometry.location.lat();
+      const lng = selectedPlace.geometry.location.lng();
+      fetchListings(lat, lng, activeFilters, newPage);
     }
   };
 
@@ -192,7 +193,6 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
               Filter
               <FontAwesomeIcon icon={faSliders} className="ml-2" />
             </div>
-
             <div className="bg-[#f6f0e8] border-3 rounded-4xl h-14 w-full md:w-2/3 lg:w-1/2 relative">
               <div className="flex flex-row items-center justify-between w-full h-full px-4">
                 <Autocomplete
@@ -224,37 +224,72 @@ export default function SearchPage({ user, setUser, savedHouses, toggleSaveHouse
                   ${activeFilters.priceRange[0]} - ${activeFilters.priceRange[1]}
                 </span>
                 <span className="px-2 py-1 bg-[#4E674A]/20 rounded-full text-sm">
-                  {activeFilters.roomType === 'any' ? 'Any Room Type' :
-                    activeFilters.roomType === 'private' ? 'Private Room' :
-                      activeFilters.roomType === 'shared' ? 'Shared Room' : 'Entire Place'}
+                  {activeFilters.roomType === 'any'
+                    ? 'Any Room Type'
+                    : activeFilters.roomType === 'private'
+                    ? 'Private Room'
+                    : activeFilters.roomType === 'shared'
+                    ? 'Shared Room'
+                    : 'Entire Place'}
+                </span>
+                <span className="px-2 py-1 bg-[#4E674A]/20 rounded-full text-sm">
+                  {activeFilters.distance} km
+                </span>
+                <span className="px-2 py-1 bg-[#4E674A]/20 rounded-full text-sm">
+                  {activeFilters.rating} Star{activeFilters.rating > 1 ? 's' : ''}
                 </span>
                 {Object.entries(activeFilters.amenities)
                   .filter(([_, isSelected]) => isSelected)
                   .map(([amenity]) => (
                     <span key={amenity} className="px-2 py-1 bg-[#4E674A]/20 rounded-full text-sm capitalize">
-                      {amenity}
+                      {amenity.replace('has_', '').replace('_', ' ')}
                     </span>
-                  ))
-                }
+                  ))}
               </div>
             </div>
           )}
+
           {loading ? (
             <div className="flex justify-center items-center py-20">
               <p className="text-xl text-[#4E674A]">Loading results...</p>
             </div>
-          ) : filteredHouses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredHouses.map(house => (
-                <HouseCard
-                  key={house.id}
-                  house={house}
-                  isSaved={savedHouses.includes(house.id)}
-                  toggleSaveHouse={toggleSaveHouse}
-                  user={user}
-                />
-              ))}
+          ) : error ? (
+            <div className="flex justify-center items-center py-20">
+              <p className="text-xl text-red-600">{error}</p>
             </div>
+          ) : filteredHouses.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredHouses.map((house) => (
+                  <HouseCard
+                    key={house.id}
+                    house={house}
+                    isSaved={savedHouses.includes(house.id)}
+                    toggleSaveHouse={toggleSaveHouse}
+                    user={user}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page <= 1}
+                  className="px-4 py-2 mx-2 bg-[#4E674A] text-white rounded disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="px-4 py-2">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page >= totalPages}
+                  className="px-4 py-2 mx-2 bg-[#4E674A] text-white rounded disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
           ) : searchValue ? (
             <div className="flex justify-center items-center py-20">
               <p className="text-xl text-[#4E674A]">No houses found for {searchValue}.</p>
