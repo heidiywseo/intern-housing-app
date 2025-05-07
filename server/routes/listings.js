@@ -32,7 +32,7 @@ router.get('/search', async (req, res) => {
     const longitude = Number(req.query.longitude);
     const room_type = req.query.room_type || 'any';
     const page = parseInt(req.query.page, 10) || 1;
-    const page_size = parseInt(req.query.page_size, 10) || 20;
+    const page_size = parseInt(req.query.page_size, 10) || 21; // Changed to 21
     const offset = (page - 1) * page_size;
 
     let places = [];
@@ -51,7 +51,7 @@ router.get('/search', async (req, res) => {
       return res.status(400).json({ error: 'Invalid amenities format' });
     }
 
-    // Validate inputs
+    // Validate inputs (unchanged)
     if (min_rating < 0 || min_rating > 5) {
       return res.status(400).json({ error: 'min_rating must be between 0 and 5' });
     }
@@ -79,7 +79,7 @@ router.get('/search', async (req, res) => {
       }
     }
 
-    // Build CTEs for places
+    // Build CTEs for places (unchanged)
     const placesQueries = [];
     places.forEach((place) => {
       const check = placesMap[place.toLowerCase()];
@@ -100,12 +100,12 @@ router.get('/search', async (req, res) => {
       ? placesQueries.join(' UNION ALL ')
       : 'SELECT NULL::float AS latitude, NULL::float AS longitude, NULL::text AS type LIMIT 0';
 
-    // Build amenities conditions
+    // Build amenities conditions (unchanged)
     const amenityConditions = amenities.length
       ? amenities.map((amenity) => `a.${amenity} = TRUE`).join(' AND ')
       : 'TRUE';
 
-    // Build query
+    // Build query with total count
     const query = `
       WITH places AS (
         ${placesUnion}
@@ -122,7 +122,8 @@ router.get('/search', async (req, res) => {
           l.latitude, 
           l.longitude, 
           r.review_scores_rating AS rating, 
-          l.price_per_month
+          l.price_per_month,
+          COUNT(*) OVER () AS total_count
         FROM airbnb_listings l
         JOIN airbnb_review_summary r ON l.id = r.listing_id
         JOIN airbnb_amenities a ON l.id = a.listing_id
@@ -148,11 +149,17 @@ router.get('/search', async (req, res) => {
         SELECT listing_id
         FROM nearby_places
         GROUP BY listing_id
-        ${places.length ? `HAVING COUNT(DISTINCT type) >= 1` : ''}
+        ${places.length ? `HAVING COUNT(DISTINCT type) >= ${places.length}` : ''}
+      ),
+      final_listings AS (
+        SELECT DISTINCT f.listing_id, f.name, f.description, f.picture_url, f.room_type,
+                       f.bedrooms, f.beds, f.latitude, f.longitude, f.rating, f.price_per_month, f.total_count
+        FROM filtered_listings f
+        ${places.length ? 'JOIN grouped_listings g ON f.listing_id = g.listing_id' : ''}
       )
-      SELECT DISTINCT f.*
-      FROM filtered_listings f
-      ${places.length ? 'JOIN grouped_listings g ON f.listing_id = g.listing_id' : ''}
+      SELECT listing_id, name, description, picture_url, room_type, bedrooms, beds,
+             latitude, longitude, rating, price_per_month, total_count
+      FROM final_listings
       ORDER BY rating DESC
       LIMIT ${page_size} OFFSET ${offset};
     `;
@@ -160,11 +167,16 @@ router.get('/search', async (req, res) => {
     console.log('Executing query:\n', query);
 
     const result = await pool.query(query);
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
+
+    // Remove total_count from each row before sending to client
+    const listings = result.rows.map(({ total_count, ...rest }) => rest);
+
     res.status(200).json({
-      listings: result.rows,
+      listings,
       page,
       page_size,
-      total: result.rowCount,
+      total: totalCount,
     });
   } catch (err) {
     console.error('Error in /listings/search:', err);
