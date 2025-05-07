@@ -37,6 +37,26 @@ export default function SignupPage() {
         email: formData.email,
       });
 
+      // Sync with AWS database via API Gateway
+      // Replace with your actual API Gateway invoke URL, e.g., https://abcdef123.execute-api.us-east-1.amazonaws.com/prod/api/users/create
+      const response = await fetch(
+        "https://<your-api-gateway-id>.execute-api.<region>.amazonaws.com/prod/api/users/create",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.uid,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to sync with AWS database");
+      }
+
       setUserId(user.uid);
       setStep("askPrefs");
     } catch (error) {

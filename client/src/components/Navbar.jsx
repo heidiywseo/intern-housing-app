@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../firebase'; // Import auth from firebase
+import { auth } from '../firebase';
 
 const Navbar = ({ user, setUser }) => {
   const navigate = useNavigate();
@@ -29,6 +29,12 @@ const Navbar = ({ user, setUser }) => {
             <span className="font-semibold text-[#4E674A]">
               Hello, {user.firstName}
             </span>
+            <button
+              onClick={() => navigate('/profile')}
+              className="hover:cursor-pointer px-4 py-2 rounded-lg bg-[#4E674A]/90 text-white font-semibold shadow-md hover:bg-[#4E674A] transition"
+            >
+              Edit Profile
+            </button>
             <button
               onClick={handleLogout}
               className="hover:cursor-pointer px-4 py-2 rounded-lg bg-[#4E674A]/90 text-white font-semibold shadow-md hover:bg-[#4E674A] transition"

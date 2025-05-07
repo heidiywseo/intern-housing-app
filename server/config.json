@@ -1,6 +1,6 @@
 {
     "server_host": "0.0.0.0",
-    "server_port": 3001,
+    "server_port": 3000,
 
     "rds_host": "final-project-group-40.ckqrzg0u1eru.us-east-1.rds.amazonaws.com",
     "rds_user": "final_project",
