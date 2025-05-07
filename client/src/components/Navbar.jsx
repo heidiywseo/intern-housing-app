@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { auth } from '../firebase'; // Import auth from firebase
 
 const Navbar = ({ user, setUser }) => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const Navbar = ({ user, setUser }) => {
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
+      alert('Failed to log out. Please try again.');
     }
   };
 
