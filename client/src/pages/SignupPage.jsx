@@ -68,7 +68,7 @@ export default function SignupPage() {
   
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen py-10 flex items-center justify-center bg-[#4E674A]/90">
       <motion.div
         className="bg-white p-10 rounded-xl shadow-xl w-full max-w-lg"
         initial={{ opacity: 0, y: 20 }}
@@ -291,7 +291,7 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
+            className="w-full bg-[#4E674A] text-white py-3 rounded-lg hover:bg-[#4E674A]/70 transition"
           >
             Sign Up
           </button>
@@ -299,7 +299,7 @@ export default function SignupPage() {
           <p className="text-center text-sm text-gray-600 mt-6">
             Already have an account? {" "}
             <span
-              className="text-blue-600 cursor-pointer hover:underline"
+              className="text-[#4E674A] cursor-pointer hover:underline"
               onClick={() => navigate("/login")}
             >
               Log in
