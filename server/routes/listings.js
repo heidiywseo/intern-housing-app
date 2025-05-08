@@ -8,10 +8,20 @@ const path = require('path');
 const configPath = path.join(__dirname, '../config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-const redis = require('redis');
-const redisClient = redis.createClient();
+// redis for caching, ignore if cannot be configured
+let redisClient = null;
 
-redisClient.connect().catch(console.error);
+try {
+  const redis = require('redis');
+  redisClient = redis.createClient();
+  redisClient.connect().catch((err) => {
+    console.warn('Redis connection failed, continuing without cache:', err.message);
+    redisClient = null;
+  });
+} catch (err) {
+  console.warn('Redis not available, continuing without cache:', err.message);
+}
+
 
 // PostgreSQL client
 const pool = new Pool({
@@ -216,35 +226,34 @@ router.get('/:id/insights', async (req, res) => {
   const cacheKey = `listing_insights:${listingId}`;
 
   try {
-    let cachedData;
-    try {
-      cachedData = await redisClient.get(cacheKey);
-    } catch (err) {
-      console.warn(`Redis error (get):`, err);
+    let cachedData = null;
+    if (redisClient) {
+      try {
+        cachedData = await redisClient.get(cacheKey);
+      } catch (err) {
+        console.warn(`Redis error (get):`, err);
+      }
     }
 
     if (cachedData) {
       return res.status(200).json(JSON.parse(cachedData));
     }
 
+    // optimized on materialized view mv_crime_geog
     const insightsQuery = `
-    WITH selected_listing AS (
-      SELECT *
+    WITH listing_point AS (
+      SELECT ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geog
       FROM airbnb_listings
       WHERE id = $1
     ), filtered_crimes AS (
       SELECT c.*
-      FROM crime c
-      JOIN selected_listing s ON TRUE
+      FROM mv_crime_geog c
+      CROSS JOIN listing_point lp
       WHERE c.date >= '2024-12-01' AND c.date < '2026-01-01'
-      AND ST_DWithin(
-        ST_MakePoint(c.longitude, c.latitude)::geography,
-        ST_MakePoint(s.longitude, s.latitude)::geography,
-        2000
-      )
+        AND ST_DWithin(c.geog, lp.geog, 2000)
     ), crime_stats AS (
       SELECT total.total_crimes, ARRAY (
-        SELECT category 
+        SELECT category
         FROM (
           SELECT category, COUNT(*) AS crime_count
           FROM filtered_crimes
@@ -253,25 +262,27 @@ router.get('/:id/insights', async (req, res) => {
           LIMIT 1
         ) AS top
       ) AS common_crimes
-      FROM (
+       FROM (
         SELECT COUNT(*) AS total_crimes
         FROM filtered_crimes
-      ) AS total
+       ) AS total
     )
-    SELECT l.*, a.*, 
-      rc.cleanliness,
-      rc.location,
-      rc.value,
-      rs.number_of_reviews,
-      rs.review_scores_rating,
-      cs.total_crimes,
-      cs.common_crimes
-    FROM selected_listing l
+    SELECT l.*, 
+    a.*,
+    rc.cleanliness,
+    rc.location,
+    rc.value,
+    rs.number_of_reviews,
+    rs.review_scores_rating,
+    cs.total_crimes,
+    cs.common_crimes
+    FROM airbnb_listings l
     LEFT JOIN airbnb_amenities a ON l.id = a.listing_id
     LEFT JOIN airbnb_review_components rc ON l.id = rc.listing_id
     LEFT JOIN airbnb_review_summary rs ON l.id = rs.listing_id
-    LEFT JOIN crime_stats cs ON TRUE;
-    `;
+    LEFT JOIN crime_stats cs ON TRUE
+    WHERE l.id = $1;
+    `
 
     const placesQuery = `
     WITH listing_point AS (
@@ -387,9 +398,16 @@ router.get('/:id/insights', async (req, res) => {
       })),
     };
     
-    // can use TTL, won't for the sake of project
-    // await redisClient.set(cacheKey, JSON.stringify(response), { EX: 3600 });
-    await redisClient.set(cacheKey, JSON.stringify(response));
+    
+    if (redisClient) {
+      try {
+        // can use TTL, won't for the sake of project
+        // // await redisClient.set(cacheKey, JSON.stringify(response), { EX: 3600 });
+        await redisClient.set(cacheKey, JSON.stringify(response));
+      } catch (err) {
+        console.warn('Redis error (set):', err);
+      }
+    }
 
     res.status(200).json(response);
   } catch (err) {
