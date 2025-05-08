@@ -13,14 +13,14 @@ const HouseCard = ({ house = {}, isSaved = false, toggleSaveHouse, user }) => {
     }
   };
 
-  const handleBookmarkClick = (e) => {
+  const handleBookmarkClick = async (e) => {
     e.stopPropagation();
     if (!user) {
       navigate('/login');
       return;
     }
     if (house.id && toggleSaveHouse) {
-      toggleSaveHouse(house.id);
+      await toggleSaveHouse(house.id.toString());
     }
   };
 

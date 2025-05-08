@@ -9,6 +9,7 @@ import { Sky } from "../models/Sky";
 import { auth } from "../firebase";
 import { Range } from "react-range";
 import Swirly from "../components/Swirly";
+import Recommendations from '../components/Recommendations';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
@@ -231,6 +232,7 @@ export default function LandingPage({ user, setUser }) {
           </Canvas>
         </div>
       </div>
+      {user && <Recommendations user={user} />}
       <About />
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4">
         <p>&copy; 2025 Woomie. All rights reserved.</p>

@@ -27,6 +27,28 @@ async function getPreferenceId(client, table, description) {
   return result.rows[0] ? result.rows[0][`${table}_id`] : null;
 }
 
+// Check if user exists
+router.get('/check', async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  try {
+    const client = await pool.connect();
+    try {
+      const userQuery = 'SELECT user_id FROM users WHERE user_id = $1';
+      const userResult = await client.query(userQuery, [userId]);
+      res.status(200).json({ exists: userResult.rows.length > 0 });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error checking user:', error);
+    res.status(500).json({ error: 'Failed to check user' });
+  }
+});
+
 // Create user endpoint
 router.post('/create', async (req, res) => {
   const client = await pool.connect();
