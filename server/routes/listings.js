@@ -184,4 +184,177 @@ router.get('/search', async (req, res) => {
   }
 });
 
+
+router.get('/:id/insights', async (req, res) => {
+  const listingId = req.params.id;
+
+  if (!listingId || isNaN(listingId)) {
+    return res.status(400).json({ error: 'listingId is invalid' });
+  }
+
+  try {
+    const insightsQuery = `
+    WITH selected_listing AS (
+      SELECT *
+      FROM airbnb_listings
+      WHERE id = $1
+    ), filtered_crimes AS (
+      SELECT c.*
+      FROM crime c
+      JOIN selected_listing s ON TRUE
+      WHERE c.date >= '2024-12-01' AND c.date < '2026-01-01'
+      AND ST_DWithin(
+        ST_MakePoint(c.longitude, c.latitude)::geography,
+        ST_MakePoint(s.longitude, s.latitude)::geography,
+        2000
+      )
+    ), crime_stats AS (
+      SELECT total.total_crimes, ARRAY (
+        SELECT category 
+        FROM (
+          SELECT category, COUNT(*) AS crime_count
+          FROM filtered_crimes
+          GROUP BY category
+          ORDER BY crime_count DESC
+          LIMIT 1
+        ) AS top
+      ) AS common_crimes
+      FROM (
+        SELECT COUNT(*) AS total_crimes
+        FROM filtered_crimes
+      ) AS total
+    )
+    SELECT l.*, a.*, 
+      rc.cleanliness,
+      rc.location,
+      rc.value,
+      rs.number_of_reviews,
+      rs.review_scores_rating,
+      cs.total_crimes,
+      cs.common_crimes
+    FROM selected_listing l
+    LEFT JOIN airbnb_amenities a ON l.id = a.listing_id
+    LEFT JOIN airbnb_review_components rc ON l.id = rc.listing_id
+    LEFT JOIN airbnb_review_summary rs ON l.id = rs.listing_id
+    LEFT JOIN crime_stats cs ON TRUE;
+    `;
+
+    const placesQuery = `
+    WITH listing_point AS (
+      SELECT ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geom
+      FROM airbnb_listings
+      WHERE id = $1
+    )
+    SELECT 'amenity' AS source, id, amenity_type AS type, name, latitude, longitude
+    FROM amenity, listing_point
+    WHERE ST_DWithin(
+      ST_SetSRID(ST_MakePoint(amenity.longitude, amenity.latitude), 4326)::geography,
+      listing_point.geom,
+      200
+    )
+    UNION ALL
+    SELECT 'leisure' AS source, id, leisure_type AS type, name, latitude, longitude
+    FROM leisure, listing_point
+    WHERE ST_DWithin(
+      ST_SetSRID(ST_MakePoint(leisure.longitude, leisure.latitude), 4326)::geography,
+      listing_point.geom,
+      200
+    )
+    UNION ALL
+    SELECT 'shop' AS source, id, shop_type AS type, name, latitude, longitude
+    FROM shop, listing_point
+    WHERE ST_DWithin(
+      ST_SetSRID(ST_MakePoint(shop.longitude, shop.latitude), 4326)::geography,
+      listing_point.geom,
+      200
+    )
+    UNION ALL
+    SELECT 'historic' AS source, id, historic_type AS type, name, latitude, longitude
+    FROM historic, listing_point
+    WHERE ST_DWithin(
+      ST_SetSRID(ST_MakePoint(historic.longitude, historic.latitude), 4326)::geography,
+      listing_point.geom,
+      200
+    )
+    UNION ALL
+    SELECT 'tourism' AS source, id, tourism_type AS type, name, latitude, longitude
+    FROM tourism, listing_point
+    WHERE ST_DWithin(
+      ST_SetSRID(ST_MakePoint(tourism.longitude, tourism.latitude), 4326)::geography,
+      listing_point.geom,
+      200
+    )
+    `;
+    const [insightsResult, placesResult] = await Promise.all([
+      pool.query(insightsQuery, [listingId]),
+      pool.query(placesQuery, [listingId])
+    ]);
+
+    if (insightsResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
+    const listing = insightsResult.rows[0];
+
+    const response = {
+      listing: {
+        id: listing.id,
+        url: listing.listing_url,
+        name: listing.name,
+        description: listing.description,
+        room_type: listing.room_type,
+        accommodates: listing.accommodates,
+        bedrooms: listing.bedrooms,
+        beds: listing.beds,
+        price_per_month: listing.price_per_month,
+        location: {
+          latitude: listing.latitude,
+          longitude: listing.longitude,
+        },
+        picture_url: listing.picture_url,
+      },
+      amenities: {
+        has_wifi: listing.has_wifi,
+        has_kitchen: listing.has_kitchen,
+        has_washer: listing.has_washer,
+        has_dryer: listing.has_dryer,
+        has_air_conditioning: listing.has_air_conditioning,
+        has_heating: listing.has_heating,
+        has_tv: listing.has_tv,
+        has_parking: listing.has_parking
+      },
+      reviews: {
+        number_of_reviews: listing.number_of_reviews,
+        review_scores_rating: listing.review_scores_rating,
+        components: {
+          cleanliness: listing.cleanliness,
+          location: listing.location,
+          value: listing.value,
+        },
+      },
+      crime_stats: {
+        total_crimes: listing.total_crimes,
+        common_crimes: listing.common_crimes,
+      },
+      nearby_places: placesResult.rows.map(place => ({
+        id: place.id,
+        type: place.type,
+        name: place.name,
+        source: place.source,
+        location: {
+          latitude: place.latitude,
+          longitude: place.longitude,
+        },
+      })),
+    };
+
+    res.status(200).json(response);
+
+  } catch (err) {
+    console.error('Error in /listings/:id/insights:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+
+});
+
 module.exports = router;
