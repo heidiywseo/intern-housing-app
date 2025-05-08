@@ -375,9 +375,9 @@ router.get('/recommendations', authenticate, async (req, res) => {
   const client = await pool.connect();
   try {
     const user_id = req.user.user_id;
-    const distance = Number(req.query.distance) || 10000; // Default 10km in meters
+    const distance = Number(req.query.distance) || 10000; 
     const page = parseInt(req.query.page, 10) || 1;
-    const page_size = parseInt(req.query.page_size, 10) || 3; // Limit to 5
+    const page_size = parseInt(req.query.page_size, 10) || 3; 
     const offset = (page - 1) * page_size;
 
     // Validate inputs
@@ -491,10 +491,10 @@ router.get('/recommendations', authenticate, async (req, res) => {
     `;
 
     const values = [
-      user_id,    // $1: user_id (string)
-      distance,   // $2: distance (number)
-      page_size,  // $3: page_size (number)
-      offset      // $4: offset (number)
+      user_id,    
+      distance,   
+      page_size,  
+      offset      
     ];
 
     console.log('Executing query:\n', query, '\nValues:', values);

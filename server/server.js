@@ -54,6 +54,9 @@ app.use('/api/users', userRoutes);
 const favoritesRoutes = require('./routes/favorites');
 app.use('/favorites', favoritesRoutes);
 
+const roommateRouter = require('./routes/roommate');
+app.use('/roommate', roommateRouter);
+
 // Basic health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK' });
