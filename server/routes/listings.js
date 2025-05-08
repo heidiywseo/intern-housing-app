@@ -8,6 +8,11 @@ const path = require('path');
 const configPath = path.join(__dirname, '../config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
+const redis = require('redis');
+const redisClient = redis.createClient();
+
+redisClient.connect().catch(console.error);
+
 // PostgreSQL client
 const pool = new Pool({
   host: config.rds_host,
@@ -208,7 +213,20 @@ router.get('/:id/insights', async (req, res) => {
     return res.status(400).json({ error: 'listingId is invalid' });
   }
 
+  const cacheKey = `listing_insights:${listingId}`;
+
   try {
+    let cachedData;
+    try {
+      cachedData = await redisClient.get(cacheKey);
+    } catch (err) {
+      console.warn(`Redis error (get):`, err);
+    }
+
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
     const insightsQuery = `
     WITH selected_listing AS (
       SELECT *
@@ -368,6 +386,10 @@ router.get('/:id/insights', async (req, res) => {
         },
       })),
     };
+    
+    // can use TTL, won't for the sake of project
+    // await redisClient.set(cacheKey, JSON.stringify(response), { EX: 3600 });
+    await redisClient.set(cacheKey, JSON.stringify(response));
 
     res.status(200).json(response);
   } catch (err) {
