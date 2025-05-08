@@ -328,6 +328,11 @@ router.get('/:id/insights', async (req, res) => {
           longitude: listing.longitude,
         },
         picture_url: listing.picture_url,
+        host: {
+          name: listing.host_name,
+          picture_url: listing.host_picture_url,
+          about: listing.host_about
+        }
       },
       amenities: {
         has_wifi: listing.has_wifi,
