@@ -289,7 +289,7 @@ router.get('/:id/insights', async (req, res) => {
       SELECT ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geom
       FROM airbnb_listings
       WHERE id = $1
-    )
+    ), all_places AS (
     SELECT 'amenity' AS source, id, amenity_type AS type, name, latitude, longitude
     FROM amenity, listing_point
     WHERE ST_DWithin(
@@ -329,7 +329,12 @@ router.get('/:id/insights', async (req, res) => {
       listing_point.geom,
       200
     )
-    `;
+  )
+  SELECT *
+  FROM all_places
+  LIMIT 3;
+    `
+
     const [insightsResult, placesResult] = await Promise.all([
       pool.query(insightsQuery, [listingId]),
       pool.query(placesQuery, [listingId])
