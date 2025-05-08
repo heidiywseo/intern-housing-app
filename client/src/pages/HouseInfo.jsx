@@ -1,25 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar, faUsers } from '@fortawesome/free-solid-svg-icons';
 import Navbar from "../components/Navbar";
 import axios from 'axios';
-
-// Dummy roommates data (to be replaced with real data in the future)
-const dummyRoommates = [
-  {
-    id: '101',
-    name: 'Alex Johnson',
-    profilePic: 'https://randomuser.me/api/portraits/women/44.jpg',
-    phone: '(555) 123-4567'
-  },
-  {
-    id: '102',
-    name: 'Jamie Smith',
-    profilePic: 'https://randomuser.me/api/portraits/men/32.jpg',
-    phone: '(555) 987-6543'
-  }
-];
 
 const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const { id } = useParams();
@@ -29,11 +13,12 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const [loading, setLoading] = useState(true);
   const [potentialRoomies, setPotentialRoomies] = useState([]);
   const [address, setAddress] = useState('Unknown');
+  const [optInStatus, setOptInStatus] = useState(null);
 
   useEffect(() => {
     const fetchHouseData = async () => {
       try {
-        // Fetch house data from the backend
+        // Fetch house data
         const response = await axios.get(`http://localhost:3000/listings/${id}/insights`, {
           headers: user ? { 'x-user-id': user.uid } : {},
         });
@@ -57,7 +42,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
         }
         setAddress(formattedAddress);
 
-        // Map backend data to the format expected by the frontend
+        // Map backend data
         const houseData = {
           id: listing.id.toString(),
           title: listing.name || 'No Title Available',
@@ -66,7 +51,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
           description: listing.description || 'No description available.',
           bedrooms: listing.bedrooms || 0,
           bathrooms: listing.beds || 0,
-          area: listing.accommodates ? listing.accommodates * 100 : 0, // Assuming 100 sq ft per person
+          area: listing.accommodates ? listing.accommodates * 100 : 0,
           amenities: [
             amenities.has_wifi && 'WiFi',
             amenities.has_kitchen && 'Kitchen',
@@ -94,12 +79,27 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
 
         setHouse(houseData);
 
-        // Temp dummy roommates logic
-        const shouldHaveRoommates = Math.random() > 0.5;
-        if (shouldHaveRoommates) {
-          setPotentialRoomies(dummyRoommates);
-        } else {
-          setPotentialRoomies([]);
+        // Fetch roommates
+        const roommatesResponse = await axios.get(`http://localhost:3000/roommate/listings/${id}/roommates`, {
+          headers: user ? { 'x-user-id': user.uid } : {},
+        });
+        console.log('Roommates response:', roommatesResponse.data);
+        setPotentialRoomies(roommatesResponse.data.roommates);
+
+        // Check opt-in status if user is authenticated
+        if (user) {
+          try {
+            const optInCheck = await axios.get(`http://localhost:3000/roommate/listings/${id}/opt-in/status`, {
+              headers: { 'x-user-id': user.uid },
+            });
+            console.log('Opt-in status:', optInCheck.data);
+            setOptInStatus(optInCheck.data.isOptedIn ? 'opted-in' : null);
+          } catch (error) {
+            if (error.response?.status !== 404) {
+              console.error('Error checking opt-in status:', error);
+            }
+            setOptInStatus(null);
+          }
         }
       } catch (error) {
         console.error('Error fetching house data:', error);
@@ -111,6 +111,84 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
 
     fetchHouseData();
   }, [id, user]);
+
+  const handleOptIn = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // Check user preferences
+      const prefResponse = await axios.get('http://localhost:3000/roommate/preferences/check', {
+        headers: { 'x-user-id': user.uid },
+      });
+
+      if (!prefResponse.data.isComplete) {
+        const incomplete = prefResponse.data.incompleteFields || [];
+        alert(`Please complete your profile preferences: ${incomplete.join(', ') || 'Some fields are missing.'}`);
+        navigate('/edit-preferences');
+        return;
+      }
+
+      // Opt in for roommate
+      const optInResponse = await axios.post(
+        `http://localhost:3000/roommate/listings/${id}/opt-in`,
+        {},
+        { headers: { 'x-user-id': user.uid } }
+      );
+
+      setOptInStatus('opted-in');
+      alert('Successfully opted in for roommate matching!');
+
+      // Refresh roommates
+      const roommatesResponse = await axios.get(`http://localhost:3000/roommate/listings/${id}/roommates`, {
+        headers: { 'x-user-id': user.uid },
+      });
+      console.log('Roommates after opt-in:', roommatesResponse.data);
+      setPotentialRoomies(roommatesResponse.data.roommates);
+    } catch (error) {
+      console.error('Error opting in:', error);
+      if (error.response?.status === 400 && error.response.data.error === 'User already opted in for this listing') {
+        setOptInStatus('opted-in');
+        alert('You have already opted in for this listing.');
+      } else {
+        alert('Failed to opt in. Please try again.');
+      }
+    }
+  };
+
+  const handleOptOut = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // Opt out of roommate matching
+      const optOutResponse = await axios.delete(`http://localhost:3000/roommate/listings/${id}/opt-in`, {
+        headers: { 'x-user-id': user.uid },
+      });
+
+      setOptInStatus(null);
+      alert('Successfully opted out of roommate matching!');
+
+      // Refresh roommates
+      const roommatesResponse = await axios.get(`http://localhost:3000/roommate/listings/${id}/roommates`, {
+        headers: { 'x-user-id': user.uid },
+      });
+      console.log('Roommates after opt-out:', roommatesResponse.data);
+      setPotentialRoomies(roommatesResponse.data.roommates);
+    } catch (error) {
+      console.error('Error opting out:', error);
+      if (error.response?.status === 400 && error.response.data.error === 'User is not opted in for this listing') {
+        setOptInStatus(null);
+        alert('You are not opted in for this listing.');
+      } else {
+        alert('Failed to opt out. Please try again.');
+      }
+    }
+  };
 
   const isSaved = savedHouses.includes(id);
 
@@ -175,8 +253,6 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                     No image available
                   </div>
                 )}
-
-                {/* Arrows */}
                 {house.images && house.images.length > 1 && (
                   <>
                     <button
@@ -207,12 +283,25 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
 
               <div className="flex justify-between items-center mt-6 mb-4">
                 <h1 className="text-3xl font-bold text-[#4E674A]">{house.title}</h1>
-                <button
-                  onClick={() => toggleSaveHouse(id)}
-                  className={`p-2 rounded-full ${isSaved ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  <FontAwesomeIcon icon={faBookmark} size="lg" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleSaveHouse(id)}
+                    className={`p-2 rounded-full ${isSaved ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <FontAwesomeIcon icon={faBookmark} size="lg" />
+                  </button>
+                  <button
+                    onClick={optInStatus === 'opted-in' ? handleOptOut : handleOptIn}
+                    className={`py-2 px-4 rounded-lg flex items-center gap-2 ${
+                      optInStatus === 'opted-in'
+                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        : 'bg-[#4E674A] text-white hover:bg-[#4E674A]/90'
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={faUsers} />
+                    {optInStatus === 'opted-in' ? 'Opt Out' : 'Opt In for Roommate'}
+                  </button>
+                </div>
               </div>
 
               <div className="flex justify-between items-center mb-6">
@@ -238,10 +327,9 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                       case 'tv': icon = faTv; break;
                       case 'heating': icon = faTemperatureHigh; break;
                       case 'washer':
-                      case 'dryer': icon = faUtensils; break; // Use same icon for washer/dryer
+                      case 'dryer': icon = faUtensils; break;
                       default: icon = null;
                     }
-
                     return (
                       <div key={index} className="flex items-center gap-3">
                         {icon && <FontAwesomeIcon icon={icon} className="text-[#4E674A]" />}
@@ -322,28 +410,31 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
             </div>
 
             <div className="lg:w-1/3 bg-white rounded-lg p-6 shadow-md h-fit">
-              <h2 className="text-xl font-semibold mb-4 text-[#4E674A]">Potential Roomies</h2>
-
+              <h2 className="text-xl font-semibold mb-4 text-[#4E674A]">Potential Roommates</h2>
               {potentialRoomies.length > 0 ? (
                 <div className="space-y-4">
                   {potentialRoomies.map(roomie => (
                     <div key={roomie.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg">
                       <img
-                        src={roomie.profilePic || 'https://via.placeholder.com/50'}
+                        src={'https://via.placeholder.com/50'} // Placeholder until real profile pics
                         alt={roomie.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                       <div>
-                        <p className="font-medium">{roomie.name}</p>
-                        <p className="text-sm text-gray-500">{roomie.phone || 'Contact through app'}</p>
+                        <p className="font-medium">
+                          {roomie.name}
+                          {user && roomie.id === user.uid && (
+                            <span className="ml-2 text-xs bg-[#4E674A] text-white px-2 py-1 rounded-full">Me</span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500">{roomie.email || 'Contact through app'}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500">No potential roommates yet. Be the first to bookmark this place!</p>
+                <p className="text-gray-500">No potential roommates yet. Opt in to connect!</p>
               )}
-
               <div className="mt-8 p-4 bg-[#EDEBE4]/50 rounded-lg">
                 <h3 className="font-semibold mb-2 text-[#4E674A]">Contact Landlord</h3>
                 <p className="text-sm text-gray-600 mb-4">Interested in this property? Reach out directly:</p>
@@ -355,7 +446,6 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
           </div>
         </div>
       </div>
-
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4 border-t border-[#4E674A]/20">
         <p>© 2025 Woomie. All rights reserved.</p>
       </footer>
