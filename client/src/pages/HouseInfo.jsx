@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar } from '@fortawesome/free-solid-svg-icons';
 import Navbar from "../components/Navbar";
-import axios from 'axios'; // Import axios for API calls
+import axios from 'axios';
 
-// Dummy roommates data (unchanged)
+// Dummy roommates data (to be replaced with real data in the future)
 const dummyRoommates = [
   {
     id: '101',
@@ -28,7 +28,8 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const [house, setHouse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [potentialRoomies, setPotentialRoomies] = useState([]);
-  
+  const [address, setAddress] = useState('Unknown');
+
   useEffect(() => {
     const fetchHouseData = async () => {
       try {
@@ -36,33 +37,59 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
         const response = await axios.get(`http://localhost:3000/listings/${id}/insights`, {
           headers: user ? { 'x-user-id': user.uid } : {},
         });
-        
-        const listing = response.data.listing;
-        const amenities = response.data.amenities;
+
+        const { listing, amenities, reviews, crime_stats, nearby_places } = response.data;
+
+        // Fetch address using Google Maps Geocoding API
+        let formattedAddress = 'Unknown';
+        try {
+          const geocodeResponse = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+            params: {
+              latlng: `${listing.location.latitude},${listing.location.longitude}`,
+              key: 'YOUR_GOOGLE_MAPS_API_KEY', // Replace with your API key
+            },
+          });
+          if (geocodeResponse.data.status === 'OK' && geocodeResponse.data.results.length > 0) {
+            formattedAddress = geocodeResponse.data.results[0].formatted_address;
+          }
+        } catch (error) {
+          console.error('Error fetching address:', error);
+        }
+        setAddress(formattedAddress);
 
         // Map backend data to the format expected by the frontend
         const houseData = {
-          id: listing.id.toString(), // Convert to string to match savedHouses
+          id: listing.id.toString(),
           title: listing.name || 'No Title Available',
-          location: `${listing.latitude}, ${listing.longitude}`, // Adjust based on your needs
-          price: listing.price_per_month,
+          location: formattedAddress,
+          price: listing.price_per_month || 0,
           description: listing.description || 'No description available.',
           bedrooms: listing.bedrooms || 0,
-          bathrooms: listing.beds || 0, // Using beds as bathrooms (adjust if you have actual bathroom data)
-          area: listing.accommodates ? `${listing.accommodates * 100} sq ft` : 'Unknown', // Placeholder
+          bathrooms: listing.beds || 0,
+          area: listing.accommodates ? listing.accommodates * 100 : 0, // Assuming 100 sq ft per person
           amenities: [
             amenities.has_wifi && 'WiFi',
             amenities.has_kitchen && 'Kitchen',
-            amenities.has_air_conditioning && 'AC',
+            amenities.has_air_conditioning && 'Air Conditioning',
             amenities.has_parking && 'Parking',
             amenities.has_washer && 'Washer',
             amenities.has_dryer && 'Dryer',
             amenities.has_heating && 'Heating',
             amenities.has_tv && 'TV',
-          ].filter(Boolean), // Filter out falsy values
-          availableFrom: 'Unknown', // Add if available in backend
-          leaseLength: 'Unknown', // Add if available in backend
+          ].filter(Boolean),
           images: [listing.picture_url || 'https://via.placeholder.com/600x400?text=No+Image'],
+          reviews: {
+            number_of_reviews: reviews?.number_of_reviews ?? 0,
+            overall_rating: Number(reviews?.review_scores_rating ?? 0),
+            cleanliness: Number(reviews?.components?.cleanliness ?? 0),
+            location: Number(reviews?.components?.location ?? 0),
+            value: Number(reviews?.components?.value ?? 0),
+          },
+          crime_stats: {
+            total_crimes: crime_stats?.total_crimes ?? 0,
+            common_crimes: crime_stats?.common_crimes ?? [],
+          },
+          nearby_places: nearby_places || [],
         };
 
         setHouse(houseData);
@@ -76,7 +103,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
         }
       } catch (error) {
         console.error('Error fetching house data:', error);
-        setHouse(null); // Trigger "House not found" on error
+        setHouse(null);
       } finally {
         setLoading(false);
       }
@@ -84,21 +111,21 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
 
     fetchHouseData();
   }, [id, user]);
-  
+
   const isSaved = savedHouses.includes(id);
-  
+
   const nextImage = () => {
     if (house && house.images) {
       setCurrentImageIndex((currentImageIndex + 1) % house.images.length);
     }
   };
-  
+
   const prevImage = () => {
     if (house && house.images) {
       setCurrentImageIndex((currentImageIndex - 1 + house.images.length) % house.images.length);
     }
   };
-  
+
   if (loading) {
     return (
       <>
@@ -109,7 +136,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
       </>
     );
   }
-  
+
   if (!house) {
     return (
       <>
@@ -120,27 +147,26 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
       </>
     );
   }
-  
-  // Rest of the component remains unchanged
+
   return (
     <div className="">
       <Navbar user={user} setUser={setUser} />
       <div className="min-h-screen bg-[#EDEBE4] py-8 px-10">
         <div className="max-w-7xl mx-auto px-4">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="mb-4 text-[#4E674A] hover:underline flex items-center gap-2"
           >
             <FontAwesomeIcon icon={faArrowLeft} /> Back to results
           </button>
-          
+
           <div className="flex flex-col lg:flex-row gap-8">
             <div className="flex-1">
-              {/* gallery */}
+              {/* Gallery */}
               <div className="relative rounded-lg overflow-hidden h-96 bg-gray-200">
                 {house.images && house.images.length > 0 ? (
-                  <img 
-                    src={house.images[currentImageIndex]} 
+                  <img
+                    src={house.images[currentImageIndex]}
                     alt={`${house.title} view ${currentImageIndex + 1}`}
                     className="w-full h-full object-cover"
                   />
@@ -149,17 +175,17 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                     No image available
                   </div>
                 )}
-                
-                {/* arrows */}
+
+                {/* Arrows */}
                 {house.images && house.images.length > 1 && (
                   <>
-                    <button 
+                    <button
                       onClick={prevImage}
                       className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white p-2 rounded-full"
                     >
                       <FontAwesomeIcon icon={faArrowLeft} className="text-gray-800" />
                     </button>
-                    <button 
+                    <button
                       onClick={nextImage}
                       className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white p-2 rounded-full"
                     >
@@ -168,7 +194,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
                       <div className="flex gap-2">
                         {house.images.map((_, index) => (
-                          <div 
+                          <div
                             key={index}
                             className={`w-2 h-2 rounded-full ${index === currentImageIndex ? 'bg-white' : 'bg-white/50'}`}
                           />
@@ -178,27 +204,27 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                   </>
                 )}
               </div>
-              
+
               <div className="flex justify-between items-center mt-6 mb-4">
                 <h1 className="text-3xl font-bold text-[#4E674A]">{house.title}</h1>
-                <button 
+                <button
                   onClick={() => toggleSaveHouse(id)}
                   className={`p-2 rounded-full ${isSaved ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'}`}
                 >
                   <FontAwesomeIcon icon={faBookmark} size="lg" />
                 </button>
               </div>
-              
+
               <div className="flex justify-between items-center mb-6">
                 <p className="text-lg text-gray-600">{house.location}</p>
                 <p className="text-xl font-semibold text-[#4E674A]">${house.price}/month</p>
               </div>
-              
+
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Description</h2>
                 <p className="text-gray-700 leading-relaxed">{house.description}</p>
               </div>
-              
+
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Amenities</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -206,12 +232,16 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                     let icon;
                     switch (amenity.toLowerCase()) {
                       case 'wifi': icon = faWifi; break;
-                      case 'ac': icon = faFan; break;
+                      case 'air conditioning': icon = faFan; break;
                       case 'kitchen': icon = faUtensils; break;
                       case 'parking': icon = faCar; break;
+                      case 'tv': icon = faTv; break;
+                      case 'heating': icon = faTemperatureHigh; break;
+                      case 'washer':
+                      case 'dryer': icon = faUtensils; break; // Use same icon for washer/dryer
                       default: icon = null;
                     }
-                    
+
                     return (
                       <div key={index} className="flex items-center gap-3">
                         {icon && <FontAwesomeIcon icon={icon} className="text-[#4E674A]" />}
@@ -221,7 +251,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                   })}
                 </div>
               </div>
-              
+
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Details</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -240,30 +270,66 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Available from</p>
-                    <p>{house.availableFrom}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Lease length</p>
-                    <p>{house.leaseLength}</p>
-                  </div>
-                  <div>
                     <p className="text-gray-500">Area</p>
                     <p>{house.area} sq ft</p>
                   </div>
                 </div>
               </div>
+
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Reviews</h2>
+                <div className="bg-white rounded-lg p-4 shadow-md">
+                  {house.reviews.number_of_reviews > 0 ? (
+                    <>
+                      <p className="flex items-center gap-2 mb-2">
+                        <FontAwesomeIcon icon={faStar} className="text-yellow-500" />
+                        <span>Overall Rating: {house.reviews.overall_rating.toFixed(1)} / 5 ({house.reviews.number_of_reviews} reviews)</span>
+                      </p>
+                      <p className="mb-1">Cleanliness: {house.reviews.cleanliness.toFixed(1)} / 5</p>
+                      <p className="mb-1">Location: {house.reviews.location.toFixed(1)} / 5</p>
+                      <p>Value: {house.reviews.value.toFixed(1)} / 5</p>
+                    </>
+                  ) : (
+                    <p className="text-gray-500">No reviews available for this listing.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Safety Information</h2>
+                <div className="bg-white rounded-lg p-4 shadow-md">
+                  <p className="mb-2">Total Crimes (within 2km, Dec 2024 - Jan 2026): {house.crime_stats.total_crimes}</p>
+                  <p>Most Common Crime Types: {house.crime_stats.common_crimes.join(', ') || 'None'}</p>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-3 text-[#4E674A]">Nearby Places</h2>
+                <div className="bg-white rounded-lg p-4 shadow-md">
+                  {house.nearby_places.length > 0 ? (
+                    <ul className="list-disc pl-5">
+                      {house.nearby_places.map((place, index) => (
+                        <li key={index} className="mb-2">
+                          {place.name || 'Unnamed'} ({place.type}, {place.source})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500">No nearby places found within 200m.</p>
+                  )}
+                </div>
+              </div>
             </div>
-            
+
             <div className="lg:w-1/3 bg-white rounded-lg p-6 shadow-md h-fit">
               <h2 className="text-xl font-semibold mb-4 text-[#4E674A]">Potential Roomies</h2>
-              
+
               {potentialRoomies.length > 0 ? (
                 <div className="space-y-4">
                   {potentialRoomies.map(roomie => (
                     <div key={roomie.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg">
-                      <img 
-                        src={roomie.profilePic || 'https://via.placeholder.com/50'} 
+                      <img
+                        src={roomie.profilePic || 'https://via.placeholder.com/50'}
                         alt={roomie.name}
                         className="w-12 h-12 rounded-full object-cover"
                       />
@@ -277,7 +343,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
               ) : (
                 <p className="text-gray-500">No potential roommates yet. Be the first to bookmark this place!</p>
               )}
-              
+
               <div className="mt-8 p-4 bg-[#EDEBE4]/50 rounded-lg">
                 <h3 className="font-semibold mb-2 text-[#4E674A]">Contact Landlord</h3>
                 <p className="text-sm text-gray-600 mb-4">Interested in this property? Reach out directly:</p>
@@ -289,7 +355,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
           </div>
         </div>
       </div>
-      
+
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4 border-t border-[#4E674A]/20">
         <p>© 2025 Woomie. All rights reserved.</p>
       </footer>
