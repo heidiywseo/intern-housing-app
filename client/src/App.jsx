@@ -15,61 +15,8 @@ import HouseInfo from './pages/HouseInfo';
 import ProfilePage from './pages/ProfilePage';
 import PreferenceForm from './pages/PreferenceForm';
 
-const dummyHouses = [
-  {
-    id: '1',
-    title: 'Modern Apartment in Downtown',
-    location: 'San Francisco, CA',
-    price: 1850,
-    description: 'A bright and spacious apartment in the heart of the city, perfect for professionals.',
-    bedrooms: 2,
-    bathrooms: 1.5,
-    area: 1200,
-    amenities: ['WiFi', 'Kitchen', 'AC', 'Parking'],
-    availableFrom: 'June 1, 2025',
-    leaseLength: '12 months',
-    images: [
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+1+Image+1',
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+1+Image+2',
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+1+Image+3'
-    ]
-  },
-  {
-    id: '2',
-    title: 'Cozy Studio near Tech Hub',
-    location: 'Seattle, WA',
-    price: 1650,
-    description: 'Stylish studio apartment within walking distance to major tech companies.',
-    bedrooms: 1,
-    bathrooms: 1,
-    area: 800,
-    amenities: ['WiFi', 'Kitchen', 'Laundry'],
-    availableFrom: 'May 15, 2025',
-    leaseLength: '6-12 months',
-    images: [
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+2+Image+1',
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+2+Image+2'
-    ]
-  },
-  {
-    id: '3',
-    title: 'Suburban House with Yard',
-    location: 'Chicago, IL',
-    price: 2100,
-    description: 'Spacious family home with yard in quiet neighborhood, ideal for remote workers.',
-    bedrooms: 3,
-    bathrooms: 2,
-    area: 1800,
-    amenities: ['WiFi', 'Kitchen', 'AC', 'Parking', 'Yard'],
-    availableFrom: 'June 15, 2025',
-    leaseLength: '12+ months',
-    images: [
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+3+Image+1',
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+3+Image+2',
-      'https://placehold.co/600x400/edebe4/4e674a?text=House+3+Image+3'
-    ]
-  }
-];
+// Remove dummyHouses since it's no longer needed
+// const dummyHouses = [...];
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +32,6 @@ export default function App() {
             uid: firebaseUser.uid,
             firstName: userDoc.data().firstName,
           });
-          // Fetch saved houses from backend
           try {
             const favoritesRes = await axios.get('http://localhost:3000/favorites', {
               headers: { 'x-user-id': firebaseUser.uid },
@@ -131,8 +77,6 @@ export default function App() {
     }
   };
 
-  const getHouseById = (id) => dummyHouses.find((house) => house.id === id) || null;
-
   return (
     <Router>
       {isLoading ? (
@@ -149,7 +93,7 @@ export default function App() {
                 setUser={setUser}
                 savedHouses={savedHouses}
                 toggleSaveHouse={toggleSaveHouse}
-                houses={dummyHouses}
+                // Pass real data or fetch in SearchPage
               />
             }
           />
@@ -161,7 +105,6 @@ export default function App() {
                 setUser={setUser}
                 savedHouses={savedHouses}
                 toggleSaveHouse={toggleSaveHouse}
-                getHouseById={getHouseById}
               />
             }
           />

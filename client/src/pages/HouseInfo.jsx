@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar } from '@fortawesome/free-solid-svg-icons';
 import Navbar from "../components/Navbar";
+import axios from 'axios'; // Import axios for API calls
 
-// Dummy roommates data
+// Dummy roommates data (unchanged)
 const dummyRoommates = [
   {
     id: '101',
@@ -20,7 +21,7 @@ const dummyRoommates = [
   }
 ];
 
-const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse, getHouseById }) => {
+const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -29,21 +30,60 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse, getHouseById }
   const [potentialRoomies, setPotentialRoomies] = useState([]);
   
   useEffect(() => {
-    const houseData = getHouseById(id);
-    
-    if (houseData) {
-      setHouse(houseData);
-      // temp dummy roomies
-      const shouldHaveRoommates = Math.random() > 0.5;
-      if (shouldHaveRoommates) {
-        setPotentialRoomies(dummyRoommates);
-      } else {
-        setPotentialRoomies([]);
+    const fetchHouseData = async () => {
+      try {
+        // Fetch house data from the backend
+        const response = await axios.get(`http://localhost:3000/listings/${id}/insights`, {
+          headers: user ? { 'x-user-id': user.uid } : {},
+        });
+        
+        const listing = response.data.listing;
+        const amenities = response.data.amenities;
+
+        // Map backend data to the format expected by the frontend
+        const houseData = {
+          id: listing.id.toString(), // Convert to string to match savedHouses
+          title: listing.name || 'No Title Available',
+          location: `${listing.latitude}, ${listing.longitude}`, // Adjust based on your needs
+          price: listing.price_per_month,
+          description: listing.description || 'No description available.',
+          bedrooms: listing.bedrooms || 0,
+          bathrooms: listing.beds || 0, // Using beds as bathrooms (adjust if you have actual bathroom data)
+          area: listing.accommodates ? `${listing.accommodates * 100} sq ft` : 'Unknown', // Placeholder
+          amenities: [
+            amenities.has_wifi && 'WiFi',
+            amenities.has_kitchen && 'Kitchen',
+            amenities.has_air_conditioning && 'AC',
+            amenities.has_parking && 'Parking',
+            amenities.has_washer && 'Washer',
+            amenities.has_dryer && 'Dryer',
+            amenities.has_heating && 'Heating',
+            amenities.has_tv && 'TV',
+          ].filter(Boolean), // Filter out falsy values
+          availableFrom: 'Unknown', // Add if available in backend
+          leaseLength: 'Unknown', // Add if available in backend
+          images: [listing.picture_url || 'https://via.placeholder.com/600x400?text=No+Image'],
+        };
+
+        setHouse(houseData);
+
+        // Temp dummy roommates logic
+        const shouldHaveRoommates = Math.random() > 0.5;
+        if (shouldHaveRoommates) {
+          setPotentialRoomies(dummyRoommates);
+        } else {
+          setPotentialRoomies([]);
+        }
+      } catch (error) {
+        console.error('Error fetching house data:', error);
+        setHouse(null); // Trigger "House not found" on error
+      } finally {
+        setLoading(false);
       }
-    }
-    
-    setLoading(false);
-  }, [id, getHouseById]);
+    };
+
+    fetchHouseData();
+  }, [id, user]);
   
   const isSaved = savedHouses.includes(id);
   
@@ -81,6 +121,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse, getHouseById }
     );
   }
   
+  // Rest of the component remains unchanged
   return (
     <div className="">
       <Navbar user={user} setUser={setUser} />
@@ -250,7 +291,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse, getHouseById }
       </div>
       
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4 border-t border-[#4E674A]/20">
-        <p>&copy; 2025 Woomie. All rights reserved.</p>
+        <p>© 2025 Woomie. All rights reserved.</p>
       </footer>
     </div>
   );
