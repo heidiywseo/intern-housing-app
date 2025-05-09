@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight, faBookmark, faUser, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faAddressBook, faHandPointLeft } from '@fortawesome/free-regular-svg-icons';
 import Navbar from "../components/Navbar";
 import axios from 'axios';
 
@@ -436,6 +437,8 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                         </p>
                         <p className="text-sm text-gray-500">{roomie.email || 'Contact through app'}</p>
                       </div>
+                      <FontAwesomeIcon icon={faAddressBook} className="text-2xl text-gray-800" />
+                      <FontAwesomeIcon icon={faHandPointLeft} className="text-2xl text-yellow-800/80" />
                     </div>
                   ))}
                 </div>

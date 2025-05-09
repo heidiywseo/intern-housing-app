@@ -25,8 +25,19 @@ const HouseCard = ({ house, isSaved, toggleSaveHouse, user, onClick }) => {
   };
 
   const title = house.title || 'No Title Available';
-  const price = house.price ? `$${house.price}/mo` : 'Price Unavailable';
-  const description = house.description || 'No description available.';
+  let priceDisplay = 'Price Unavailable';
+  if (house.price != null) {
+    let amount = typeof house.price === 'string'
+      ? parseFloat(house.price.replace(/[^0-9.]/g, ''))
+      : house.price;
+    if (!isNaN(amount)) {
+      const rounded = Math.round(amount);
+      priceDisplay = `$${rounded}/mo`;
+    }
+  }
+
+  let description = house.description || 'No description available.';
+  description = description.replace(/<br\s*\/?>(?=<br\s*\/?>)?/gi, ' ');
   const image = house.images?.[0] || 'https://via.placeholder.com/400x200?text=No+Image';
   const bedrooms = house.bedrooms || '--';
   const bathrooms = house.bathrooms || '--';
@@ -52,11 +63,10 @@ const HouseCard = ({ house, isSaved, toggleSaveHouse, user, onClick }) => {
         alt={title}
         className="h-48 w-full object-cover bg-gray-800 rounded-t-lg"
       />
-
       <div className="bg-white rounded-b-lg p-6 shadow-md h-auto">
         <div className="flex justify-between">
-          <h2 className="text-xl font-semibold mb-2">{title}</h2>
-          <span className="text-[#4E674A] font-semibold">{price}</span>
+          <h2 className="text-xl font-semibold mb-4 pr-2">{title}</h2>
+          <span className="text-[#4E674A] font-semibold text-yellow-800/60">{priceDisplay}</span>
         </div>
 
         <p className="text-[#4E674A]/70 mb-2">{description}</p>

@@ -5,9 +5,6 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { City } from "../models/City";
 import { FlyingPlane } from "../models/FlyingPlane";
-import { Sky } from "../models/Sky";
-import { auth } from "../firebase";
-import { Range } from "react-range";
 import Swirly from "../components/Swirly";
 import Recommendations from '../components/Recommendations';
 

@@ -24,13 +24,31 @@ export default function SearchPage({ user, setUser }) {
   const [autocomplete, setAutocomplete] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const [hasInitialSearch, setHasInitialSearch] = useState(false);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
   });
+
+    useEffect(() => {
+    if (!isLoaded || hasInitialSearch) return;
+    const raw = sessionStorage.getItem("initialSearchState");
+    if (!raw) return;
+    sessionStorage.removeItem("initialSearchState");
+
+    const { place, query } = JSON.parse(raw);
+    if (place && place.lat != null) {
+      setSearchValue(query);
+      setSelectedPlace({
+        formatted_address: query,
+        geometry: { location: { lat: () => place.lat, lng: () => place.lng } },
+      });
+      fetchListings(place.lat, place.lng, activeFilters, 1);
+      setHasInitialSearch(true);
+    }
+  }, [isLoaded, hasInitialSearch]);
+
 
   // Fetch user's favorite listings
   useEffect(() => {

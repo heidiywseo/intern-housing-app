@@ -20,7 +20,7 @@ const Navbar = ({ user, setUser }) => {
     <div className="flex items-center justify-between bg-[#EDEBE4] p-4">
       <div className="flex items-center hover:cursor-pointer" onClick={() => navigate('/')}>
         <img src="/woomie3.svg" alt="Woomie Logo" className="h-10 w-10" />
-        <p className="text-xl font-bold pl-2 pb-1 text-[#4E674A]">woomie</p>
+        <p className="text-xl font-bold pl-2 pb-1 text-[#4E674A]">woomies</p>
         <p className="font-semibold pl-10 text-[#4E674A]">About Us</p>
       </div>
       <div className="flex items-center space-x-4">
