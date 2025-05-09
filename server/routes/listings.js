@@ -178,10 +178,11 @@ router.get('/search', async (req, res) => {
       nearby_places AS (
         SELECT f.listing_id, p.type
         FROM filtered_listings f
-        JOIN places p ON ST_DistanceSphere(
+        JOIN places p ON ST_DWithin(
           ST_MakePoint(f.longitude, f.latitude),
-          ST_MakePoint(p.longitude, p.latitude)
-        ) <= 200 
+          ST_MakePoint(p.longitude, p.latitude),
+          200
+        )
       ),
       grouped_listings AS (
         SELECT listing_id
