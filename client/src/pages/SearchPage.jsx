@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlass, faSliders, faMap } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faSliders } from '@fortawesome/free-solid-svg-icons';
 import { Autocomplete, useLoadScript } from '@react-google-maps/api';
 import Navbar from '../components/Navbar';
 import HouseCard from '../components/HouseCard';
@@ -322,13 +322,12 @@ export default function SearchPage({ user, setUser }) {
                     placeholder="Search for an address"
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
-                    className="w-full p-3 text-lg font-semibold text-[#4E674A]/70 rounded-lg focus:outline-none bg-transparent"
+                    className="w-96 p-3 text-lg font-semibold text-[#4E674A]/70 rounded-lg focus:outline-none bg-transparent"
                   />
                 </Autocomplete>
                 <FontAwesomeIcon icon={faMagnifyingGlass} className="text-[#4E674A]/50 text-xl mr-4" />
               </div>
             </div>
-            <FontAwesomeIcon icon={faMap} className="ml-4 text-3xl text-[#4E674A]" />
           </div>
 
           {activeFilters && (

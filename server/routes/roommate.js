@@ -298,4 +298,55 @@ router.get('/listings/:id/opt-ins', async (req, res) => {
   }
 });
 
+// checking roomate prefs
+router.get(
+  '/:id/preferences',
+  async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const user_id = req.params.id;
+      const q = `
+        SELECT 
+          u.min_budget,
+          u.max_budget,
+          u.work_zip_code,
+          rs.description AS roommate_status,
+          st.description AS sleep_time,
+          wt.description AS wake_time,
+          cl.description AS cleanliness,
+          nt.description AS noise_tolerance,
+          gf.description AS guest_frequency,
+          sp.description AS smoking_preference,
+          dp.description AS drinking_preference,
+          pp.description AS pet_preference
+        FROM users u
+        LEFT JOIN roommate_status rs ON u.roommate_status_id = rs.roommate_status_id
+        LEFT JOIN sleep_time st ON u.sleep_time_id = st.sleep_time_id
+        LEFT JOIN wake_time wt ON u.wake_time_id = wt.wake_time_id
+        LEFT JOIN cleanliness cl ON u.cleanliness_id = cl.cleanliness_id
+        LEFT JOIN noise_tolerance nt ON u.noise_tolerance_id = nt.noise_tolerance_id
+        LEFT JOIN guest_frequency gf ON u.guest_frequency_id = gf.guest_frequency_id
+        LEFT JOIN smoking_preference sp ON u.smoking_preference_id = sp.smoking_preference_id
+        LEFT JOIN drinking_preference dp ON u.drinking_preference_id = dp.drinking_preference_id
+        LEFT JOIN pet_preference pp ON u.pet_preference_id = pp.pet_preference_id
+        WHERE u.user_id = $1
+      `;
+      const { rows } = await client.query(q, [user_id]);
+      client.release();
+
+      if (!rows.length) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      console.log(`user prefs for ${user_id}:`, rows[0]);
+
+      return res.json(rows[0]);
+    } catch (err) {
+      client.release();
+      console.error('Error fetching preferences:', err);
+      return res.status(500).json({ error: 'Internal server' });
+    }
+  }
+);
+
+
 module.exports = router;

@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight, faBookmark, faUser, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar, faUsers } from '@fortawesome/free-solid-svg-icons';
 import { faAddressBook, faHandPointLeft } from '@fortawesome/free-regular-svg-icons';
 import Navbar from "../components/Navbar";
+import { PreferencesModal } from '../components/PrefModal';
 import axios from 'axios';
 
 const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
@@ -15,6 +16,45 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const [potentialRoomies, setPotentialRoomies] = useState([]);
   const [address, setAddress] = useState('');
   const [optInStatus, setOptInStatus] = useState(null);
+  const [showPrefModal, setShowPrefModal] = useState(false);
+  const [selectedRoomie, setSelectedRoomie] = useState(null);
+  const [roomiePrefs, setRoomiePrefs] = useState(null);
+
+  const openPrefModal = async (roomie) => {
+    try {
+      const { data } = await axios.get(
+        `http://localhost:3000/roommate/${roomie.id}/preferences`
+      );
+
+      const mapped = {
+        minBudget: data.min_budget,
+        maxBudget: data.max_budget,
+        workLocation: data.work_zip_code,
+        roommateStatus: data.roommate_status,
+        sleepTime: data.sleep_time,
+        wakeTime: data.wake_time,
+        cleanliness: data.cleanliness,
+        noiseTolerance: data.noise_tolerance,
+        guests: data.guest_frequency,
+        smoking: data.smoking_preference,
+        drinking: data.drinking_preference,
+        pets: data.pet_preference,
+      };
+      setRoomiePrefs(mapped);
+      setSelectedRoomie(roomie);
+      setShowPrefModal(true);
+    } catch (err) {
+      console.error(err);
+      alert('Could not load preferences');
+    }
+  };
+
+  const closePrefModal = () => {
+    setShowPrefModal(false);
+    setSelectedRoomie(null);
+    setRoomiePrefs(null);
+  };
+
 
   useEffect(() => {
     const fetchHouseData = async () => {
@@ -49,7 +89,8 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
           title: listing.name || 'No Title Available',
           location: formattedAddress,
           price: listing.price_per_month || 0,
-          description: listing.description || 'No description available.',
+          description: (listing.description || 'No description available.')
+            .replace(/<\/?br\s*\/?>/gi, ' '),
           bedrooms: listing.bedrooms || 0,
           bathrooms: listing.beds || 0,
           area: listing.accommodates ? listing.accommodates * 100 : 0,
@@ -304,8 +345,8 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                   <button
                     onClick={optInStatus === 'opted-in' ? handleOptOut : handleOptIn}
                     className={`py-2 px-4 rounded-lg flex items-center gap-2 ${optInStatus === 'opted-in'
-                        ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-[#4E674A] text-white hover:bg-[#4E674A]/90'
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-[#4E674A] text-white hover:bg-[#4E674A]/90'
                       }`}
                   >
                     <FontAwesomeIcon icon={faUsers} />
@@ -425,20 +466,35 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                 <div className="space-y-4">
                   {potentialRoomies.map(roomie => (
                     <div key={roomie.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg">
-                      <div className="flex bg-gray-400 w-10 h-10 items-center justify-center rounded-3xl">
-                        <FontAwesomeIcon icon={faUser} />
+                      <div className="flex items-center gap-4">
+                        <div className="bg-gray-400 w-10 h-10 flex items-center justify-center rounded-3xl">
+                          <FontAwesomeIcon icon={faUser} />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {roomie.name}
+                            {user && roomie.id === user.uid && (
+                              <span className="ml-2 text-xs bg-[#4E674A] text-white px-2 py-1 rounded-full">
+                                Me
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {roomie.email || 'Contact through app'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">
-                          {roomie.name}
-                          {user && roomie.id === user.uid && (
-                            <span className="ml-2 text-xs bg-[#4E674A] text-white px-2 py-1 rounded-full">Me</span>
-                          )}
-                        </p>
-                        <p className="text-sm text-gray-500">{roomie.email || 'Contact through app'}</p>
+                      <div className="ml-auto flex items-center gap-4">
+                        <FontAwesomeIcon
+                          icon={faAddressBook}
+                          className="text-2xl text-gray-800 cursor-pointer hover:text-gray-600"
+                          onClick={() => openPrefModal(roomie)}
+                        />
+                        {/* <FontAwesomeIcon
+                          icon={faHandPointLeft}
+                          className="text-2xl text-yellow-800/80"
+                        /> */}
                       </div>
-                      <FontAwesomeIcon icon={faAddressBook} className="text-2xl text-gray-800" />
-                      <FontAwesomeIcon icon={faHandPointLeft} className="text-2xl text-yellow-800/80" />
                     </div>
                   ))}
                 </div>
@@ -452,6 +508,14 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4 border-t border-[#4E674A]/20">
         <p>© 2025 Woomie. All rights reserved.</p>
       </footer>
+
+      <PreferencesModal
+        open={showPrefModal}
+        onClose={closePrefModal}
+        roomieName={selectedRoomie?.name}
+        prefs={roomiePrefs || {}}
+      />
+
     </div>
   );
 };
