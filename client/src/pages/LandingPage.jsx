@@ -189,7 +189,7 @@ export default function LandingPage({ user, setUser }) {
           <Swirly />
           <div className="flex-col w-4/5 pt-20">
             <div className="text-6xl text-left mb-8">
-              Woomie
+              Woomies
             </div>
             <div className="text-4xl font-semibold mt-4">
               Find your next work roomie
@@ -278,7 +278,7 @@ export default function LandingPage({ user, setUser }) {
       <About />
       {user && <Recommendations user={user} />}
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4">
-        <p>&copy; 2025 Woomie. All rights reserved.</p>
+        <p>&copy; 2025 Woomies. All rights reserved.</p>
       </footer>
     </>
   );

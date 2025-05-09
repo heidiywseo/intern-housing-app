@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faArrowRight, faBookmark, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faArrowRight, faBookmark, faUser, faBed, faBath, faWifi, faFan, faUtensils, faCar, faTv, faTemperatureHigh, faStar, faUsers } from '@fortawesome/free-solid-svg-icons';
 import Navbar from "../components/Navbar";
 import axios from 'axios';
 
@@ -12,7 +12,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
   const [house, setHouse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [potentialRoomies, setPotentialRoomies] = useState([]);
-  const [address, setAddress] = useState('Unknown');
+  const [address, setAddress] = useState('');
   const [optInStatus, setOptInStatus] = useState(null);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
         const { listing, amenities, reviews, crime_stats, nearby_places } = response.data;
 
         // Fetch address using Google Maps Geocoding API
-        let formattedAddress = 'Unknown';
+        let formattedAddress = '';
         try {
           const geocodeResponse = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
             params: {
@@ -424,11 +424,9 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                 <div className="space-y-4">
                   {potentialRoomies.map(roomie => (
                     <div key={roomie.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg">
-                      <img
-                        src={'https://via.placeholder.com/50'} // Placeholder until real profile pics
-                        alt={roomie.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
+                      <div className="flex bg-gray-400 w-10 h-10 items-center justify-center rounded-3xl">
+                        <FontAwesomeIcon icon={faUser} />
+                      </div>
                       <div>
                         <p className="font-medium">
                           {roomie.name}
@@ -444,13 +442,6 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
               ) : (
                 <p className="text-gray-500">No potential roommates yet. Opt in to connect!</p>
               )}
-              <div className="mt-8 p-4 bg-[#EDEBE4]/50 rounded-lg">
-                <h3 className="font-semibold mb-2 text-[#4E674A]">Contact Landlord</h3>
-                <p className="text-sm text-gray-600 mb-4">Interested in this property? Reach out directly:</p>
-                <button className="w-full py-2 bg-[#4E674A] text-white rounded-lg hover:bg-[#4E674A]/90">
-                  Message Landlord
-                </button>
-              </div>
             </div>
           </div>
         </div>

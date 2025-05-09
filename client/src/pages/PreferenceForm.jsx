@@ -59,8 +59,9 @@ export default function PreferenceForm({ userId, onComplete }) {
   };
 
   return (
+    <div className="flex bg-[#4E674A] items-center justify-center min-h-screen">
     <motion.div
-      className="bg-white p-10 rounded-xl shadow-xl w-full max-w-lg"
+      className="bg-white my-10 p-10 rounded-xl shadow-xl w-full max-w-lg"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -266,5 +267,6 @@ export default function PreferenceForm({ userId, onComplete }) {
         </button>
       </form>
     </motion.div>
+    </div>
   );
 }
