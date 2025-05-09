@@ -188,17 +188,13 @@ router.get('/search', async (req, res) => {
         FROM nearby_places
         GROUP BY listing_id
         ${places.length ? `HAVING COUNT(DISTINCT type) >= ${places.length}` : ''}
-      ),
-      final_listings AS (
-        SELECT DISTINCT f.*
-        FROM filtered_listings f
-        ${places.length ? 'JOIN grouped_listings g ON f.listing_id = g.listing_id' : ''}
       )
-      SELECT listing_id, name, description, picture_url, room_type, bedrooms, beds,
-             latitude, longitude, rating, price_per_month, total_count
-      FROM final_listings
+      SELECT DISTINCT f.*
+      FROM filtered_listings f
+      ${places.length ? 'JOIN grouped_listings g ON f.listing_id = g.listing_id' : ''}
       ORDER BY rating DESC
-      LIMIT $7 OFFSET $8
+      LIMIT $7 
+      OFFSET $8
     `;
 
     const fitParams = [
@@ -208,69 +204,71 @@ router.get('/search', async (req, res) => {
     ];
 
     const fitQuery = `
-      WITH user_point AS (
-        SELECT ST_MakePoint($2, $3)::geography AS geo
-      ),
-      user_profile AS (
+      WITH user_profile AS (
         SELECT 
-        COALESCE(u.min_budget, 800) AS min_budget,
-        COALESCE(u.max_budget, 1500) AS max_budget
+        COALESCE(u.min_budget, 500) AS min_budget,
+        COALESCE(u.max_budget, 3000) AS max_budget,
+        ST_MakePoint($2, $3)::geography AS geo
         FROM (
           SELECT $1::text AS user_id
         ) input
         LEFT JOIN users u ON u.user_id = input.user_id
       ),
       nearby_listings AS (
-        SELECT al.id, al.price_per_month, ars.review_scores_rating
+        SELECT 
+          al.id, 
+          al.price_per_month, 
+          ars.review_scores_rating,
+          up.min_budget,
+          up.max_budget
         FROM mv_airbnb_listings_geog al
         JOIN airbnb_review_summary ars ON al.id = ars.listing_id
-        JOIN user_point up ON TRUE
-        WHERE ST_DWithin(
-          al.geog,
-          up.geo, 
-          1000
-        )
+        JOIN user_profile up ON ST_DWithin(al.geog, up.geo, 1000)
       ),
       price_score AS (
-        SELECT AVG(
-          CASE
-          WHEN nl.price_per_month BETWEEN up.min_budget AND up.max_budget THEN 1.0
-          WHEN nl.price_per_month < up.min_budget THEN 0.8
-          WHEN nl.price_per_month > up.max_budget THEN 0.4
-          ELSE 0.0
-          END
-        ) AS score
-        FROM nearby_listings nl, user_profile up
+        SELECT 
+          AVG(
+            CASE
+              WHEN nl.price_per_month BETWEEN nl.min_budget AND nl.max_budget THEN 1.0
+              WHEN nl.price_per_month < nl.min_budget THEN 0.8
+              WHEN nl.price_per_month > nl.max_budget THEN 0.4
+              ELSE 0.0
+            END
+          ) AS price_score,
+          AVG(nl.review_scores_rating) / 5.0 AS review_score
+          FROM nearby_listings nl
       ),
-      review_score AS (
-        SELECT AVG(review_scores_rating) / 5.0 AS score
-        FROM nearby_listings
+      crime_counts AS (
+        SELECT COUNT(*) AS num_crimes
+        FROM mv_crime_geog c
+        CROSS JOIN user_profile up
+        WHERE c.date >= '2024-12-01' AND c.date < '2026-01-01'
+        AND ST_DWithin(c.geog, up.geo, 2000)
       ),
       crime_score AS (
-        SELECT 1.0 - LEAST(COUNT(*) / 20.0, 1.0) AS score
-        FROM mv_crime_geog c
-        JOIN user_point up ON TRUE
-        WHERE ST_DWithin(
-          c.geog,
-          up.geo, 
-          2000
-        )
+        SELECT
+          CASE
+            WHEN num_crimes >= 500 THEN 0.0
+            ELSE ROUND(1.0 - num_crimes / 500.0, 2)
+          END AS score
+        FROM crime_counts
       ),
       total_score AS (
         SELECT 
-        (0.45 * ps.score +
-        0.35 * cs.score +
-        0.2 * rs.score) AS weighted_score
-        FROM price_score ps, crime_score cs, review_score rs
+          (0.45 * ags.price_score +
+          0.35 * cs.score +
+          0.2 * ags.review_score) AS weighted_score
+        FROM price_score ags, crime_score cs
       )
-      SELECT ROUND(weighted_score, 2) AS score,
+      SELECT 
+      ROUND(weighted_score, 2) AS score,
       CASE
         WHEN weighted_score >= 0.8 THEN 'Great'
         WHEN weighted_score >= 0.6 THEN 'Good'
         WHEN weighted_score >= 0.4 THEN 'Average'
         ELSE 'Not ideal'
       END AS intern_fit_description
-      FROM total_score
+      FROM total_score;
     `;
 
     console.log('Executing query:\n', mainQuery);
@@ -323,7 +321,6 @@ router.get('/:id/insights', async (req, res) => {
       return res.status(200).json(JSON.parse(cachedData));
     }
 
-    // what is the different between cross join and join on true
     const insightsQuery = `
       WITH listing_point AS (
         SELECT geog
@@ -407,8 +404,7 @@ router.get('/:id/insights', async (req, res) => {
           SELECT 'tourism', id, tourism_type, name, latitude, longitude,
             ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
           FROM tourism
-        ) AS combined_places,
-        listing_point lp
+        ) AS combined_places, listing_point lp
         WHERE ST_DWithin(combined_places.geog, lp.geog, 200)
       )
       SELECT *
