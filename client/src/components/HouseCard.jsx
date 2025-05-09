@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark as solidBookmark } from '@fortawesome/free-solid-svg-icons';
 import { faBookmark as regularBookmark } from '@fortawesome/free-regular-svg-icons';
 
-const HouseCard = ({ house = {}, isSaved = false, toggleSaveHouse, user }) => {
+const HouseCard = ({ house, isSaved, toggleSaveHouse, user, onClick }) => {
   const navigate = useNavigate();
 
   const handleCardClick = () => {
@@ -35,7 +35,7 @@ const HouseCard = ({ house = {}, isSaved = false, toggleSaveHouse, user }) => {
   return (
     <div
       className="hover:scale-[1.03] duration-300 ease-in-out cursor-pointer relative"
-      onClick={handleCardClick}
+      onClick={onClick}
     >
       <button
         className="absolute top-2 right-2 z-10 bg-white/80 p-2 rounded-full hover:bg-white"

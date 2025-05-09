@@ -25,6 +25,8 @@ export default function SearchPage({ user, setUser }) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [hasInitialSearch, setHasInitialSearch] = useState(false);
+
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
@@ -57,6 +59,47 @@ export default function SearchPage({ user, setUser }) {
     }
     window.scrollTo(0, 0);
   }, [location.search]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return
+    };
+
+    if (hasInitialSearch) {
+      return
+    };
+
+    const raw = sessionStorage.getItem("lastSearchState");
+    if (!raw) return;
+
+    const state = JSON.parse(raw);
+    const addressParam = new URLSearchParams(location.search).get("address");
+    if (
+      addressParam &&
+      decodeURIComponent(addressParam) === state.query
+    ) {
+      // restore form + place object
+      setSearchValue(state.query);
+      setSelectedPlace({
+        formatted_address: state.place.formatted_address,
+        geometry: {
+          location: {
+            lat: () => state.place.lat,
+            lng: () => state.place.lng
+          }
+        }
+      });
+      // restore listings
+      setFilteredHouses(state.results);
+      // restore filters + pagination
+      setActiveFilters(state.filters);
+      setPage(state.page);
+      setTotalPages(state.totalPages);
+
+      setHasInitialSearch(true);
+    }
+  }, [isLoaded, hasInitialSearch, location.search]);
+
 
   useEffect(() => {
     if (showFilterModal) {
@@ -281,10 +324,10 @@ export default function SearchPage({ user, setUser }) {
                   {activeFilters.roomType === 'any'
                     ? 'Any Room Type'
                     : activeFilters.roomType === 'private'
-                    ? 'Private Room'
-                    : activeFilters.roomType === 'shared'
-                    ? 'Shared Room'
-                    : 'Entire Place'}
+                      ? 'Private Room'
+                      : activeFilters.roomType === 'shared'
+                        ? 'Shared Room'
+                        : 'Entire Place'}
                 </span>
                 <span className="px-2 py-1 bg-[#4E674A]/20 rounded-full text-sm">
                   {activeFilters.distance} km
@@ -314,7 +357,7 @@ export default function SearchPage({ user, setUser }) {
           ) : filteredHouses.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredHouses.map((house) => (
+                {/* {filteredHouses.map((house) => (
                   <HouseCard
                     key={house.id}
                     house={house}
@@ -322,7 +365,39 @@ export default function SearchPage({ user, setUser }) {
                     toggleSaveHouse={toggleSaveHouse}
                     user={user}
                   />
+                ))} */}
+                {filteredHouses.map(house => (
+                  <HouseCard
+                    key={house.id}
+                    house={house}
+                    isSaved={savedHouses.includes(house.id)}
+                    toggleSaveHouse={toggleSaveHouse}
+                    user={user}
+                    onClick={() => {
+                      // 1) snapshot everything we need
+                      const snapshot = {
+                        query: searchValue,
+                        place: selectedPlace
+                          ? {
+                            formatted_address: selectedPlace.formatted_address,
+                            lat: selectedPlace.geometry.location.lat(),
+                            lng: selectedPlace.geometry.location.lng()
+                          }
+                          : null,
+                        results: filteredHouses,
+                        filters: activeFilters,
+                        page,
+                        totalPages
+                      };
+                      // 2) persist it
+                      sessionStorage.setItem("lastSearchState", JSON.stringify(snapshot));
+                      sessionStorage.setItem("lastSearchAddress", searchValue);
+                      // 3) navigate
+                      navigate(`/house/${house.id}`);
+                    }}
+                  />
                 ))}
+
               </div>
               <div className="flex justify-center mt-6">
                 <button

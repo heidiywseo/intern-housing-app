@@ -226,13 +226,23 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
     );
   }
 
+  const lastSearchAddress = sessionStorage.getItem("lastSearchAddress") || "";
+
   return (
     <div className="">
       <Navbar user={user} setUser={setUser} />
       <div className="min-h-screen bg-[#EDEBE4] py-8 px-10">
         <div className="max-w-7xl mx-auto px-4">
-          <button
+          {/* <button
             onClick={() => navigate(-1)}
+            className="mb-4 text-[#4E674A] hover:underline flex items-center gap-2"
+          >
+            <FontAwesomeIcon icon={faArrowLeft} /> Back to results
+          </button> */}
+          <button
+            onClick={() =>
+              navigate(`/search?address=${encodeURIComponent(lastSearchAddress)}`)
+            }
             className="mb-4 text-[#4E674A] hover:underline flex items-center gap-2"
           >
             <FontAwesomeIcon icon={faArrowLeft} /> Back to results
@@ -292,11 +302,10 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                   </button>
                   <button
                     onClick={optInStatus === 'opted-in' ? handleOptOut : handleOptIn}
-                    className={`py-2 px-4 rounded-lg flex items-center gap-2 ${
-                      optInStatus === 'opted-in'
+                    className={`py-2 px-4 rounded-lg flex items-center gap-2 ${optInStatus === 'opted-in'
                         ? 'bg-red-500 text-white hover:bg-red-600'
                         : 'bg-[#4E674A] text-white hover:bg-[#4E674A]/90'
-                    }`}
+                      }`}
                   >
                     <FontAwesomeIcon icon={faUsers} />
                     {optInStatus === 'opted-in' ? 'Opt Out' : 'Opt In for Roommate'}

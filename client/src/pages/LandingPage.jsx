@@ -232,8 +232,8 @@ export default function LandingPage({ user, setUser }) {
           </Canvas>
         </div>
       </div>
-      {user && <Recommendations user={user} />}
       <About />
+      {user && <Recommendations user={user} />}
       <footer className="bg-[#EDEBE4] text-[#4E674A] text-sm text-center py-4">
         <p>&copy; 2025 Woomie. All rights reserved.</p>
       </footer>

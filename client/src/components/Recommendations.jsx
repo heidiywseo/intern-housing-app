@@ -94,7 +94,7 @@ const Recommendations = ({ user }) => {
   if (!user) return null;
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container px-10 py-12 z-9999 bg-[#ccd0c4]">
       <h2 className="text-3xl font-bold text-[#4E674A] mb-6">Top Recommendations for You</h2>
       {loading && <p>Loading...</p>}
       {error && <p className="text-red-500">{error}</p>}
