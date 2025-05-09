@@ -25,13 +25,14 @@ export default function SearchPage({ user, setUser }) {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasInitialSearch, setHasInitialSearch] = useState(false);
+  const [internFit, setInternFit] = useState(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
     libraries,
   });
 
-    useEffect(() => {
+  useEffect(() => {
     if (!isLoaded || hasInitialSearch) return;
     const raw = sessionStorage.getItem("initialSearchState");
     if (!raw) return;
@@ -179,6 +180,8 @@ export default function SearchPage({ user, setUser }) {
         throw new Error(errorData.error || 'Failed to fetch listings');
       }
       const data = await response.json();
+
+      setInternFit(data.intern_fit_score);
 
       setFilteredHouses(
         data.listings.map((listing) => ({
@@ -328,6 +331,17 @@ export default function SearchPage({ user, setUser }) {
                 <FontAwesomeIcon icon={faMagnifyingGlass} className="text-[#4E674A]/50 text-xl mr-4" />
               </div>
             </div>
+            <div className="w-40 p-4 bg-[#2F4F43]/80 rounded-lg shadow text-center ml-70">
+                <p className="text-xs text-white uppercase">Area Fit Score</p>
+                {internFit ? (
+                  <>
+                    <p className="text-xl text-white font-bold">{internFit.score}</p>
+                    <p className="text-sm text-white">{internFit.intern_fit_description}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">Loading…</p>
+                )}
+              </div>
           </div>
 
           {activeFilters && (

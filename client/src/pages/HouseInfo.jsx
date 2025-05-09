@@ -345,7 +345,7 @@ const HouseInfo = ({ user, setUser, savedHouses, toggleSaveHouse }) => {
                   <button
                     onClick={optInStatus === 'opted-in' ? handleOptOut : handleOptIn}
                     className={`py-2 px-4 rounded-lg flex items-center gap-2 ${optInStatus === 'opted-in'
-                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      ? 'bg-[#A33B3B] text-white hover:bg-[#AA1919]'
                       : 'bg-[#4E674A] text-white hover:bg-[#4E674A]/90'
                       }`}
                   >
