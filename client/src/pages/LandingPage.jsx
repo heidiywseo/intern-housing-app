@@ -11,6 +11,8 @@ import { Range } from "react-range";
 import Swirly from "../components/Swirly";
 import Recommendations from '../components/Recommendations';
 
+import { Autocomplete, useLoadScript } from "@react-google-maps/api";
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 
@@ -100,11 +102,50 @@ export default function LandingPage({ user, setUser }) {
   const [commuteRange, setCommuteRange] = useState([0, 120]);
   const [ratingRange, setRatingRange] = useState([0, 5]);
 
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: ["places"],
+  });
 
   // for landing page search bar
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [autocomplete, setAutocomplete] = useState(null);
+
+  const handlePlaceSelect = () => {
+    if (!autocomplete) return;
+    const place = autocomplete.getPlace();
+    if (!place.formatted_address || !place.geometry) return;
+
+    const formatted = place.formatted_address;
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+
+    sessionStorage.setItem(
+      "initialSearchState",
+      JSON.stringify({
+        place: { formatted_address: formatted, lat, lng },
+        query: formatted
+      })
+    );
+
+    navigate(`/search?address=${encodeURIComponent(formatted)}`);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (!searchValue.trim()) return;
+
+    sessionStorage.setItem(
+      "initialSearchState", JSON.stringify({
+        place: null,
+        query: searchValue
+      })
+    );
+
+    navigate(`/search?address=${encodeURIComponent(searchValue)}`);
+  };
 
   const cities = [
     "San Francisco",
@@ -135,7 +176,7 @@ export default function LandingPage({ user, setUser }) {
     setSelectedCity(cityName);
     setSearchValue(cityName);
     setShowDropdown(false);
-    
+
     window.scrollTo(0, 0);
     navigate(`/search?city=${encodeURIComponent(cityName)}`);
   };
@@ -146,42 +187,44 @@ export default function LandingPage({ user, setUser }) {
       <div className="flex">
         <div className="w-full flex pl-40 bg-[#EDEBE4] text-[#4E674A] flex justify-center font-bold" style={{ height: '80vh' }}>
           <Swirly />
-          <div className="flex-col w-4/5 pt-24">
-            <div className="text-6xl text-left">
+          <div className="flex-col w-4/5 pt-20">
+            <div className="text-6xl text-left mb-8">
               Woomie
             </div>
             <div className="text-4xl font-semibold mt-4">
               Find your next work roomie
             </div>
+            <div className="text-xl font-semibold mt-4 text-[#4E674A]/70">
+              Search for stays across San Francisco, NY, Seattle, Chicago, DC, and LA.
+            </div>
             {/* search bar */}
-            <div className="bg-[#f6f0e8] border-3 rounded-4xl h-16 w-90 mt-8 relative">
-              <div className="flex flex-row items-center justify-between w-full h-full px-4">
-                <form className="w-full">
-                  <input
-                    placeholder="Search for your city"
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    onFocus={handleSearchFocus}
-                    onBlur={handleSearchBlur}
-                    className="w-full p-3 text-xl font-semibold text-[#4E674A]/70 rounded-lg focus:outline-none bg-transparent"
-                  />
-                </form>
-                <FontAwesomeIcon icon={faMagnifyingGlass} className="text-[#4E674A]/50 text-xl mr-4" />
-              </div>
-
-              {showDropdown && (
-                <div className="absolute left-0 right-0 mt-2 bg-white rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
-                  {cities.map((city, index) => (
-                    <div
-                      key={index}
-                      className="p-3 hover:bg-[#f6f0e8] cursor-pointer text-[#4E674A] font-semibold"
-                      onClick={() => handleCitySelect(city)}
-                    >
-                      {city}
-                    </div>
-                  ))}
-                </div>
+            <div className="bg-[#f6f0e8] -ml-1 border-3 rounded-4xl h-16 w-90 mt-8 relative flex items-center px-4">
+              {isLoaded ? (
+                <Autocomplete
+                  onLoad={setAutocomplete}
+                  onPlaceChanged={handlePlaceSelect}
+                  options={{
+                    types: ["address"],
+                    componentRestrictions: { country: "us" },
+                  }}
+                >
+                  <form className="w-full" onSubmit={handleSearchSubmit}>
+                    <input
+                      placeholder="Search for an address"
+                      value={searchValue}
+                      onChange={(e) => setSearchValue(e.target.value)}
+                      className="w-full p-3 text-lg font-semibold text-[#4E674A]/70 rounded-lg focus:outline-none bg-transparent"
+                    />
+                  </form>
+                </Autocomplete>
+              ) : (
+                <input
+                  placeholder="Loading Maps…"
+                  disabled
+                  className="w-96 p-3 text-lg font-semibold text-[#4E674A]/70 rounded-lg focus:outline-none bg-transparent"
+                />
               )}
+              <FontAwesomeIcon icon={faMagnifyingGlass} className="text-[#4E674A]/50 text-xl ml-10" />
             </div>
           </div>
           <div className="w-20"></div>
