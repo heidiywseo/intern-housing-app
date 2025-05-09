@@ -22,7 +22,6 @@ try {
   console.warn('Redis not available, continuing without cache:', err.message);
 }
 
-
 // PostgreSQL client
 const pool = new Pool({
   host: config.rds_host,
@@ -58,6 +57,7 @@ const placesMap = {
   gym: { table: 'leisure', column: 'leisure_type', values: ['fitness_centre'] },
   supermarket: { table: 'shop', column: 'shop_type', values: ['supermarket', 'grocery'] },
 };
+
 
 router.get('/search', async (req, res) => {
   try {
@@ -138,35 +138,40 @@ router.get('/search', async (req, res) => {
     const amenityConditions = amenities.length
       ? amenities.map((amenity) => `a.${amenity} = TRUE`).join(' AND ')
       : 'TRUE';
+    
+    const queryParams = [
+      longitude, latitude, distance, min_rating,
+      min_price, max_price, page_size, offset,
+    ];
 
-    const query = `
-      WITH places AS (
-        ${placesUnion}
-      ),
-      filtered_listings AS (
-        SELECT 
-          l.id AS listing_id, 
-          l.name, 
-          l.description,
-          l.picture_url,
-          l.room_type,
-          l.bedrooms,
-          l.beds,
-          l.latitude, 
-          l.longitude, 
-          r.review_scores_rating AS rating, 
-          l.price_per_month,
-          COUNT(*) OVER () AS total_count
-        FROM airbnb_listings l
+    const mainQuery = `
+    WITH places AS (
+      ${placesUnion}
+    ),
+    filtered_listings AS (
+      SELECT 
+        l.id AS listing_id, 
+        l.name, 
+        l.description,
+        l.picture_url,
+        l.room_type,
+        l.bedrooms,
+        l.beds,
+        l.latitude, 
+        l.longitude, 
+        r.review_scores_rating AS rating, 
+        l.price_per_month,
+        COUNT(*) OVER () AS total_count
+        FROM mv_airbnb_listings_geog l
         JOIN airbnb_review_summary r ON l.id = r.listing_id
         JOIN airbnb_amenities a ON l.id = a.listing_id
         WHERE ST_DWithin(
-          ST_MakePoint(l.longitude, l.latitude)::geography,
-          ST_MakePoint(${longitude}, ${latitude})::geography,
-          ${distance}
+          l.geog,
+          ST_MakePoint($1, $2)::geography,
+          $3
         )
-          AND r.review_scores_rating::numeric >= ${min_rating}
-          AND l.price_per_month::numeric BETWEEN ${min_price} AND ${max_price}
+          AND r.review_scores_rating::numeric >= $4
+          AND l.price_per_month::numeric BETWEEN $5 AND $6
           ${room_type !== 'any' ? `AND l.room_type = '${room_type}'` : ''}
           AND ${amenityConditions}
       ),
@@ -185,8 +190,7 @@ router.get('/search', async (req, res) => {
         ${places.length ? `HAVING COUNT(DISTINCT type) >= ${places.length}` : ''}
       ),
       final_listings AS (
-        SELECT DISTINCT f.listing_id, f.name, f.description, f.picture_url, f.room_type,
-                       f.bedrooms, f.beds, f.latitude, f.longitude, f.rating, f.price_per_month, f.total_count
+        SELECT DISTINCT f.*
         FROM filtered_listings f
         ${places.length ? 'JOIN grouped_listings g ON f.listing_id = g.listing_id' : ''}
       )
@@ -194,27 +198,107 @@ router.get('/search', async (req, res) => {
              latitude, longitude, rating, price_per_month, total_count
       FROM final_listings
       ORDER BY rating DESC
-      LIMIT ${page_size} OFFSET ${offset};
+      LIMIT $7 OFFSET $8
     `;
 
-    console.log('Executing query:\n', query);
+    const fitParams = [
+      req.user?.user_id || null,
+      longitude,
+      latitude,
+    ];
 
-    const result = await pool.query(query);
-    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count, 10) : 0;
+    const fitQuery = `
+      WITH user_point AS (
+        SELECT ST_MakePoint($2, $3)::geography AS geo
+      ),
+      user_profile AS (
+        SELECT 
+        COALESCE(u.min_budget, 800) AS min_budget,
+        COALESCE(u.max_budget, 1500) AS max_budget
+        FROM (
+          SELECT $1::text AS user_id
+        ) input
+        LEFT JOIN users u ON u.user_id = input.user_id
+      ),
+      nearby_listings AS (
+        SELECT al.id, al.price_per_month, ars.review_scores_rating
+        FROM mv_airbnb_listings_geog al
+        JOIN airbnb_review_summary ars ON al.id = ars.listing_id
+        JOIN user_point up ON TRUE
+        WHERE ST_DWithin(
+          al.geog,
+          up.geo, 
+          1000
+        )
+      ),
+      price_score AS (
+        SELECT AVG(
+          CASE
+          WHEN nl.price_per_month BETWEEN up.min_budget AND up.max_budget THEN 1.0
+          WHEN nl.price_per_month < up.min_budget THEN 0.8
+          WHEN nl.price_per_month > up.max_budget THEN 0.4
+          ELSE 0.0
+          END
+        ) AS score
+        FROM nearby_listings nl, user_profile up
+      ),
+      review_score AS (
+        SELECT AVG(review_scores_rating) / 5.0 AS score
+        FROM nearby_listings
+      ),
+      crime_score AS (
+        SELECT 1.0 - LEAST(COUNT(*) / 20.0, 1.0) AS score
+        FROM mv_crime_geog c
+        JOIN user_point up ON TRUE
+        WHERE ST_DWithin(
+          c.geog,
+          up.geo, 
+          2000
+        )
+      ),
+      total_score AS (
+        SELECT 
+        (0.45 * ps.score +
+        0.35 * cs.score +
+        0.2 * rs.score) AS weighted_score
+        FROM price_score ps, crime_score cs, review_score rs
+      )
+      SELECT ROUND(weighted_score, 2) AS score,
+      CASE
+        WHEN weighted_score >= 0.8 THEN 'Great'
+        WHEN weighted_score >= 0.6 THEN 'Good'
+        WHEN weighted_score >= 0.4 THEN 'Average'
+        ELSE 'Not ideal'
+      END AS intern_fit_description
+      FROM total_score
+    `;
 
-    const listings = result.rows.map(({ total_count, ...rest }) => rest);
+    console.log('Executing query:\n', mainQuery);
+    console.log('Executing query:\n', fitQuery);
+
+    const [listingResult, fitResult] = await Promise.all([
+      pool.query(mainQuery, queryParams),
+      pool.query(fitQuery, fitParams),
+    ]);
+
+    const totalCount = listingResult.rows.length > 0 ? parseInt(listingResult.rows[0].total_count, 10) : 0;
+
+    const listings = listingResult.rows.map(({ total_count, ...rest }) => rest);
+    const internFitScore = fitResult.rows.length > 0 ? fitResult.rows[0] : null;
 
     res.status(200).json({
       listings,
       page,
       page_size,
       total: totalCount,
+      intern_fit_score: internFitScore,
     });
   } catch (err) {
     console.error('Error in /listings/search:', err);
     return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
+
 
 router.get('/:id/insights', async (req, res) => {
   const listingId = req.params.id;
@@ -239,101 +323,102 @@ router.get('/:id/insights', async (req, res) => {
       return res.status(200).json(JSON.parse(cachedData));
     }
 
-    // optimized on materialized view mv_crime_geog
+    // what is the different between cross join and join on true
     const insightsQuery = `
-    WITH listing_point AS (
-      SELECT ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geog
-      FROM airbnb_listings
-      WHERE id = $1
-    ), filtered_crimes AS (
-      SELECT c.*
-      FROM mv_crime_geog c
-      CROSS JOIN listing_point lp
-      WHERE c.date >= '2024-12-01' AND c.date < '2026-01-01'
-        AND ST_DWithin(c.geog, lp.geog, 2000)
-    ), crime_stats AS (
-      SELECT total.total_crimes, ARRAY (
-        SELECT category
+      WITH listing_point AS (
+        SELECT geog
+        FROM mv_airbnb_listings_geog
+        WHERE id = $1
+      ), 
+      filtered_crimes AS (
+        SELECT c.*
+        FROM mv_crime_geog c
+        CROSS JOIN listing_point lp
+        WHERE c.date >= '2024-12-01' AND c.date < '2026-01-01'
+          AND ST_DWithin(c.geog, lp.geog, 2000)
+      ), 
+      crime_stats AS (
+        SELECT total.total_crimes, 
+        ARRAY (
+          SELECT category
+          FROM (
+            SELECT category, COUNT(*) AS crime_count
+            FROM filtered_crimes
+            GROUP BY category
+            ORDER BY crime_count DESC
+            LIMIT 1
+          ) AS top
+        ) AS common_crimes
         FROM (
-          SELECT category, COUNT(*) AS crime_count
+          SELECT COUNT(*) AS total_crimes
           FROM filtered_crimes
-          GROUP BY category
-          ORDER BY crime_count DESC
-          LIMIT 1
-        ) AS top
-      ) AS common_crimes
-       FROM (
-        SELECT COUNT(*) AS total_crimes
-        FROM filtered_crimes
-       ) AS total
-    )
-    SELECT l.*, 
-    a.*,
-    rc.cleanliness,
-    rc.location,
-    rc.value,
-    rs.number_of_reviews,
-    rs.review_scores_rating,
-    cs.total_crimes,
-    cs.common_crimes
-    FROM airbnb_listings l
-    LEFT JOIN airbnb_amenities a ON l.id = a.listing_id
-    LEFT JOIN airbnb_review_components rc ON l.id = rc.listing_id
-    LEFT JOIN airbnb_review_summary rs ON l.id = rs.listing_id
-    LEFT JOIN crime_stats cs ON TRUE
-    WHERE l.id = $1;
-    `
+        ) AS total
+      )
+      SELECT l.*, 
+        a.*,
+        rc.cleanliness,
+        rc.location,
+        rc.value,
+        rs.number_of_reviews,
+        rs.review_scores_rating,
+        cs.total_crimes,
+        cs.common_crimes
+      FROM airbnb_listings l
+      LEFT JOIN airbnb_amenities a ON l.id = a.listing_id
+      LEFT JOIN airbnb_review_components rc ON l.id = rc.listing_id
+      LEFT JOIN airbnb_review_summary rs ON l.id = rs.listing_id
+      LEFT JOIN crime_stats cs ON TRUE
+      WHERE l.id = $1
+    `;
 
     const placesQuery = `
-    WITH listing_point AS (
-      SELECT ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geom
-      FROM airbnb_listings
-      WHERE id = $1
-    ), all_places AS (
-    SELECT 'amenity' AS source, id, amenity_type AS type, name, latitude, longitude
-    FROM amenity, listing_point
-    WHERE ST_DWithin(
-      ST_SetSRID(ST_MakePoint(amenity.longitude, amenity.latitude), 4326)::geography,
-      listing_point.geom,
-      200
-    )
-    UNION ALL
-    SELECT 'leisure' AS source, id, leisure_type AS type, name, latitude, longitude
-    FROM leisure, listing_point
-    WHERE ST_DWithin(
-      ST_SetSRID(ST_MakePoint(leisure.longitude, leisure.latitude), 4326)::geography,
-      listing_point.geom,
-      200
-    )
-    UNION ALL
-    SELECT 'shop' AS source, id, shop_type AS type, name, latitude, longitude
-    FROM shop, listing_point
-    WHERE ST_DWithin(
-      ST_SetSRID(ST_MakePoint(shop.longitude, shop.latitude), 4326)::geography,
-      listing_point.geom,
-      200
-    )
-    UNION ALL
-    SELECT 'historic' AS source, id, historic_type AS type, name, latitude, longitude
-    FROM historic, listing_point
-    WHERE ST_DWithin(
-      ST_SetSRID(ST_MakePoint(historic.longitude, historic.latitude), 4326)::geography,
-      listing_point.geom,
-      200
-    )
-    UNION ALL
-    SELECT 'tourism' AS source, id, tourism_type AS type, name, latitude, longitude
-    FROM tourism, listing_point
-    WHERE ST_DWithin(
-      ST_SetSRID(ST_MakePoint(tourism.longitude, tourism.latitude), 4326)::geography,
-      listing_point.geom,
-      200
-    )
-  )
-  SELECT *
-  FROM all_places
-  LIMIT 3;
-    `
+      WITH listing_point AS (
+        SELECT geog
+        FROM mv_airbnb_listings_geog
+        WHERE id = $1
+      ), 
+      all_places AS (
+        SELECT source, id, type, name, latitude, longitude
+        FROM (
+          SELECT 'amenity' AS source, id, amenity_type AS type, name, latitude, longitude,
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography AS geog
+          FROM amenity
+          
+          UNION ALL
+          
+          SELECT 'leisure', id, leisure_type, name, latitude, longitude,
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
+          FROM leisure
+          
+          UNION ALL
+          
+          SELECT 'shop', id, shop_type, name, latitude, longitude,
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
+          FROM shop
+          
+          UNION ALL
+          
+          SELECT 'historic', id, historic_type, name, latitude, longitude,
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
+          FROM historic
+          
+          UNION ALL
+          
+          SELECT 'tourism', id, tourism_type, name, latitude, longitude,
+            ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography
+          FROM tourism
+        ) AS combined_places,
+        listing_point lp
+        WHERE ST_DWithin(combined_places.geog, lp.geog, 200)
+      )
+      SELECT *
+      FROM all_places
+      LIMIT 3
+    `;
+
+
+    console.log('Executing query:\n', insightsQuery);
+    console.log('Executing query:\n', placesQuery);
 
     const [insightsResult, placesResult] = await Promise.all([
       pool.query(insightsQuery, [listingId]),
@@ -403,7 +488,6 @@ router.get('/:id/insights', async (req, res) => {
       })),
     };
     
-    
     if (redisClient) {
       try {
         // can use TTL, won't for the sake of project
@@ -420,6 +504,7 @@ router.get('/:id/insights', async (req, res) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
+
 
 router.get('/recommendations', authenticate, async (req, res) => {
   const client = await pool.connect();
@@ -482,7 +567,7 @@ router.get('/recommendations', authenticate, async (req, res) => {
           rs.review_scores_rating AS rating,
           l.price_per_month,
           COUNT(*) OVER () AS total_count
-        FROM airbnb_listings l
+        FROM mv_airbnb_listings_geog l
         JOIN airbnb_review_summary rs ON l.id = rs.listing_id
         JOIN airbnb_amenities a ON l.id = a.listing_id
         JOIN user_prefs up ON TRUE
@@ -495,7 +580,7 @@ router.get('/recommendations', authenticate, async (req, res) => {
           AND (
             up.work_latitude IS NULL OR
             ST_DWithin(
-              ST_MakePoint(l.longitude, l.latitude)::geography,
+              l.geog,
               ST_MakePoint(up.work_longitude, up.work_latitude)::geography,
               $2
             )
@@ -513,7 +598,7 @@ router.get('/recommendations', authenticate, async (req, res) => {
             WHERE s.shop_type IN ('supermarket', 'grocery')
             AND ST_DWithin(
               ST_MakePoint(s.longitude, s.latitude)::geography,
-              ST_MakePoint(l.longitude, l.latitude)::geography,
+              l.geog,
               1000
             )
           )
