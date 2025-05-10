@@ -13,6 +13,13 @@ Over 4 million college students take on summer internships every year. However, 
 
 With **Woomies**, we hope to take the stress out of finding short-term housing so you can focus on what really matters - making the most of your internship, building new connections, and enjoying your summer experience.
 
+## Running Woomies Locally (Guide)
+- Clone the repository to your local device.
+- Checkout the branch **jimin-frontend**.
+- Run **npm install** to install all project dependencies. Do this for both /server and /client (cd into the folders respectively).
+- Cd into /server and run the command **npm start**.
+- Open a new terminal window, cd into /client and run the command **npm run dev**.
+- The project should run successfully on localhost:5173, with the server on http://0.0.0.0:3000.
 
 ###### The platform is currently in early development. As more features are implemented, any updates to the repository will be made **here**. Thank you for your patience!
 
