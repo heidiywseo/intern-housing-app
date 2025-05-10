@@ -15,6 +15,7 @@ With **Woomies**, we hope to take the stress out of finding short-term housing s
 
 ## Running Woomies Locally (Guide)
 - Clone the repository to your local device.
+- Checkout the branch **jimin-frontend**.
 - Run **npm install** to install all project dependencies. Do this for both /server and /client (cd into the folders respectively).
 - Cd into /server and run the command **npm start**.
 - Open a new terminal window, cd into /client and run the command **npm run dev**.
